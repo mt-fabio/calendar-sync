@@ -14,6 +14,7 @@
   "license": "MIT",
   "dependencies": {
     "@babel/core": "7.13.14",
+    "aws-sdk": "2.1350.0",
     "colors": "1.4.0",
     "csv-parse": "4.15.3",
     "date-holidays": "3.0.1",
