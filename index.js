@@ -1,4 +1,5 @@
-require('dotenv').config();
+const S3 = require('./s3');
+const s3 = new S3('calendar-sync-bucket');
 
 const { askIfContinue } = require('./lib/ask.js');
 const jobcan = new (require('./model/jobcan.js'))();
@@ -18,19 +19,31 @@ function getDateRange() {
   return { timeMin, timeMax };
 }
 
-async function main() {
-  const output = process.env.OUTPUT.toUpperCase();
+async function main(userFolderName) {
+  const credentialsFileContent = await s3.downloadFile(userFolderName, 'credentials.json');
+  const envFileContent = await s3.downloadFile(userFolderName, '.env');
+  const jiraFileContent = await s3.downloadFile(userFolderName, 'jira.json');
+  const eventsFileContent = await s3.downloadFile(userFolderName, 'events.json');
+
+  const credentials = JSON.parse(credentialsFileContent);
+  const jiraConfig = JSON.parse(jiraFileContent);
+  const eventsConfig = JSON.parse(eventsFileContent);
+
+  // Load environment variables from the .env file content
+  const env = require('dotenv').parse(envFileContent);
+
+  const output = env.OUTPUT.toUpperCase();
   const { timeMin, timeMax } = getDateRange();
 
   console.log(colors.bold(`\n🤖 Locale ${moment.locale()}, timezone ${moment().format('Z')}`));
   console.log(colors.bold(`Search between ${colors.blue(timeMin)} and ${colors.blue(timeMax)}`));
 
   // TODO: support CSV
-  const input = new (require(`./model/${process.env.INPUT}.js`))();
+  const input = new (require(`./model/${env.INPUT}.js`))(s3, userFolderName, env);
   const inputEvents = await input.getEventList(timeMin, timeMax);
 
-  const jiraEvents = await require(`./input/${process.env.INPUT}.js`)(process.env.JIRA_STRATEGY, inputEvents);
-  const jobcanEvents = await require(`./input/${process.env.INPUT}.js`)(process.env.JOBCAN_STRATEGY, inputEvents);
+  const jiraEvents = await require(`./input/${env.INPUT}.js`)(env.JIRA_STRATEGY, inputEvents);
+  const jobcanEvents = await require(`./input/${env.INPUT}.js`)(env.JOBCAN_STRATEGY, inputEvents);
 
   if (output === 'JOBCAN') {
     jobcan.display(jobcanEvents);
@@ -61,4 +74,19 @@ async function main() {
   }
 }
 
-main().catch(console.error);
+exports.handler = async (event, context) => {
+  try {
+    const userFolderName = 'brandon_lamb'; // You can pass this value from the Lambda event
+    await main(userFolderName);
+    return {
+      statusCode: 200,
+      body: 'Success',
+    };
+  } catch (error) {
+    console.error(error);
+    return {
+      statusCode: 500,
+      body: 'Error',
+    };
+  }
+};
