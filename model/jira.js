@@ -16,26 +16,28 @@ class Jira {
   }
 
   logEvent(event) {
-    const isHoliday = (date) => {
-      return (
-        ['Sat', 'Sun'].indexOf(date.format('ddd')) !== -1 ||
-        JapaneseHolidays.isHoliday(date.toDate())
-      );
-    }
+    event.ids.forEach((id) => {
+      const isHoliday = (date) => {
+        return (
+          ['Sat', 'Sun'].indexOf(date.format('ddd')) !== -1 ||
+          JapaneseHolidays.isHoliday(date.toDate())
+        );
+      }
 
-    const eventDuration = moment.duration(event.duration, 'minutes');
-    const line = [
-      colors.blue(moment(event.start).format('MM-DD')),
-      `${eventDuration.asHours().toFixed(2)}`,
-      colors.grey(event.description),
-    ].join("  ");
+      const eventDuration = moment.duration(event.duration / event.ids.length, 'minutes');
+      const line = [
+        colors.blue(moment(event.start).format('MM-DD')),
+        colors.yellow(id),
+        `${eventDuration.asHours().toFixed(2)}`,
+        colors.grey(event.description),
+      ].join("  ");
 
-    if (isHoliday(moment(event.start))) {
-      console.log(colors.red(line));
-    } else {
-      console.log(line);
-    }
-
+      if (isHoliday(moment(event.start))) {
+        console.log(colors.red(line));
+      } else {
+        console.log(line);
+      }
+    });
     return event;
   }
 
@@ -154,36 +156,62 @@ class Jira {
   }
 
   async persist(googleEvents) {
-    let jiraEvents = googleEvents.map((event) => {
+    let formattedEvents = googleEvents.map((event) => {
       const formattedEvent = {
-        id: event.id,
         calendarId: event.calendarId,
-        description: event.description,
-        startAt: moment.utc(event.start).toISOString().replace('Z', '+0000'),
-        timeSpentSeconds: event.duration * 60,
+        worklogs: []
       };
+
+      event.ids.forEach((id) => {
+        formattedEvent.worklogs.push({
+          id: id,
+          description: event.description,
+          startAt: moment.utc(event.start).toISOString().replace('Z', '+0000'),
+          timeSpentSeconds: (event.duration / event.ids.length) * 60,
+        })
+      });
+
       return formattedEvent;
     });
 
     const savedEvents = await this.getSavedEvents();
-    for (let jiraEvent of jiraEvents) {
-      const calendarId = jiraEvent.calendarId;
+    for (let event of formattedEvents) {
+      const calendarId = event.calendarId;
       let savedEvent = savedEvents[calendarId];
+
       if (savedEvent) {
-        const shouldUpdate = (
-          jiraEvent.description != savedEvent.description || jiraEvent.timeSpentSeconds != savedEvent.timeSpentSeconds
-        );
-        if (shouldUpdate) {
-          console.log(colors.green(`updateWorklog: ${jiraEvent.description}`));
-          // returns jiraEvent with the new worklog ID
-          jiraEvent = await this.updateWorklog(savedEvent.jiraWorklogId, jiraEvent);
+        for (let worklog of event.worklogs) {
+          let found = false;
+          for (let savedWorklog of savedEvent.worklogs) {
+            if (savedWorklog.id === worklog.id) {
+              found = true;
+              const shouldUpdate = (
+                worklog.description != savedWorklog.description || worklog.timeSpentSeconds != savedWorklog.timeSpentSeconds
+              );
+              if (shouldUpdate) {
+                console.log(colors.green(`updateWorklog: ${worklog.id} ${worklog.description}`));
+                // returns jiraEvent with the new worklog ID
+                worklog = await this.updateWorklog(savedWorklog.jiraWorklogId, worklog);
+              }
+
+              break;
+            }
+          }
+
+          if (!found) { // add new
+            console.log(colors.blue(`addWorklog: ${worklog.id} ${worklog.description}`));
+            worklog = await this.addWorklog(worklog); // returns jiraEvent with the new worklog ID
+          }
         }
+
       } else {
-        console.log(colors.blue(`addWorklog: ${jiraEvent.description}`));
-        jiraEvent = await this.addWorklog(jiraEvent); // returns jiraEvent with the new worklog ID
+        for (let worklog of event.worklogs) {
+          console.log(colors.blue(`addWorklog: ${worklog.id} ${worklog.description}`));
+          worklog = await this.addWorklog(worklog); // returns jiraEvent with the new worklog ID
+        }
       }
 
-      savedEvents[calendarId] = jiraEvent;
+      savedEvents[calendarId] = event;
     }
 
     await this.saveEvents(savedEvents);

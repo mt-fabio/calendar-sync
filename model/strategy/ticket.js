@@ -1,5 +1,23 @@
 const moment = require('moment-timezone');
 
+function getIds(summary, description) {
+  const ids = [];
+  let s = summary;
+  let d = description;
+  let id = extractTicketID(s) || extractTicketID(d);
+
+  while (id) {
+    ids.push(id);
+    if (s)
+      s = s.replace(id, '')
+    if (d)
+      d = d.replace(id, '')
+
+    id = extractTicketID(s) || extractTicketID(d);
+  }
+
+  return ids.length > 0 ? ids : null
+}
 function extractTicketID(value) {
   const regex = /[\[{](([a-zA-Z]+)-([0-9]+))[\]}]/;
   const match = regex.exec(value);
@@ -31,15 +49,9 @@ function getDate(date) {
 
 module.exports = function (events) {
   // pre-process
-  // console.log(events.map((e) => {
-  //   return {
-  //     description: e.description
-  //   }
-  // }));
-
   let hash = events
     .map((event) => ({
-      id: extractTicketID(event.summary) || extractTicketID(event.description),
+      ids: getIds(event.summary, event.description),
       calendarId: event.id,
       outOfOffice: event.eventType === 'outOfOffice',
       description: event.summary,
@@ -55,7 +67,7 @@ module.exports = function (events) {
     .filter((event) => event.attended) // only events we accepted
     .filter((event) => event.start) // only consider events that are not all-day events
     .filter((event) => !event.outOfOffice) // filter out events of type out of office
-    .filter((event) => event.id); // filter out events without a ticket in the summary or description
+    .filter((event) => event.ids); // filter out events without a ticket in the summary or description
 
   return hash;
 };
