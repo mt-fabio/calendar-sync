@@ -189,7 +189,7 @@ class Jira {
                 worklog.description != savedWorklog.description || worklog.timeSpentSeconds != savedWorklog.timeSpentSeconds
               );
               if (shouldUpdate) {
-                console.log(colors.green(`updateWorklog: ${worklog.id} ${worklog.description}`));
+                console.log(colors.green(`${worklog.id}: ${worklog.description}`));
                 // returns jiraEvent with the new worklog ID
                 worklog = await this.updateWorklog(savedWorklog.jiraWorklogId, worklog);
               }
@@ -199,14 +199,14 @@ class Jira {
           }
 
           if (!found) { // add new
-            console.log(colors.blue(`addWorklog: ${worklog.id} ${worklog.description}`));
+            console.log(colors.blue(`${worklog.id}: ${worklog.description}`));
             worklog = await this.addWorklog(worklog); // returns jiraEvent with the new worklog ID
           }
         }
 
       } else {
         for (let worklog of event.worklogs) {
-          console.log(colors.blue(`addWorklog: ${worklog.id} ${worklog.description}`));
+          console.log(colors.blue(`${worklog.id}: ${worklog.description}`));
           worklog = await this.addWorklog(worklog); // returns jiraEvent with the new worklog ID
         }
       }
