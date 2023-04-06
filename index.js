@@ -1,23 +1,26 @@
 require('dotenv').config();
 
-const AWS = require('aws-sdk');
-const s3 = new AWS.S3();
 const { askIfContinue } = require('./lib/ask.js');
 const jobcan = new (require('./model/jobcan.js'))();
 const jira = new (require('./model/jira.js'))();
 const colors = require('colors/safe');
 const moment = require('moment-timezone');
 
-function getDateRange(startDate, endDate) {
-  let timeMin = startDate ? moment(startDate).toISOString() : moment().subtract(1, 'day').startOf('day').toISOString();
-  let timeMax = endDate ? moment(endDate).toISOString() : moment().subtract(1, 'day').endOf('day').toISOString();
+function getDateRange() {
+  let unit = 'week';
+  let timeMin = moment().subtract(1, unit).startOf(unit).toISOString();
+  let timeMax = moment().subtract(1, unit).endOf(unit).toISOString();
+
+  let myArgs = process.argv.slice(2);
+  if (myArgs[0]) timeMin = moment(myArgs[0]).toISOString();
+  if (myArgs[1]) timeMax = moment(myArgs[1]).toISOString();
 
   return { timeMin, timeMax };
 }
 
-async function main(startDate, endDate) {
+async function main() {
   const output = process.env.OUTPUT.toUpperCase();
-  const { timeMin, timeMax } = getDateRange(startDate, endDate);
+  const { timeMin, timeMax } = getDateRange();
 
   console.log(colors.bold(`\n🤖 Locale ${moment.locale()}, timezone ${moment().format('Z')}`));
   console.log(colors.bold(`Search between ${colors.blue(timeMin)} and ${colors.blue(timeMax)}`));
@@ -58,60 +61,4 @@ async function main(startDate, endDate) {
   }
 }
 
-async function listUserFolders(bucket, prefix) {
-  try {
-    const response = await s3
-      .listObjectsV2({
-        Bucket: bucket,
-        Prefix: prefix,
-        Delimiter: '/',
-      })
-      .promise();
-
-    return response.CommonPrefixes.map(({ Prefix }) => Prefix);
-  } catch (error) {
-    console.error('Error listing user folders:', error);
-    throw error;
-  }
-}
-
-async function getFileFromS3(bucket, key) {
-  try {
-    const response = await s3
-      .getObject({
-        Bucket: bucket,
-        Key: key,
-      })
-      .promise();
-
-    return JSON.parse(response.Body.toString('utf-8'));
-  } catch (error) {
-    console.error(`Error getting file ${key} from S3:`, error);
-    throw error;
-  }
-}
-
-exports.handler = async (event) => {
-  const bucket = 'calendar-sync-bucket';
-  const userFoldersPrefix = 'CalendarSyncUsers/';
-
-  try {
-    // List user folders in the S3 bucket
-    const userFolders = await listUserFolders(bucket, userFoldersPrefix);
-
-    // Process each user folder
-    for (const userFolder of userFolders) {
-      // Retrieve start and end dates, credentials, and environment variables from S3
-      const startDate = event.startDate;
-      const endDate = event.endDate;
-      const credentials = await getFileFromS3(bucket, `${userFolder}credentials.json`);
-      const jiraCredentials = await getFileFromS3(bucket, `${userFolder}jira.json`);
-      const token = await getFileFromS3(bucket, `${userFolder}token.json`);
-
-      // Call the main function with the user's data
-      await main(startDate, endDate, userFolder, credentials, jiraCredentials, token);
-    }
-  } catch (error) {
-    console.error(error);
-  }
-};
+main().catch(console.error);
