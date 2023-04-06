@@ -7,12 +7,12 @@ const moment = require('moment-timezone');
 
 function getDateRange() {
   let unit = 'week';
-  let timeMin = moment().subtract(1, unit).startOf(unit).toISOString();
-  let timeMax = moment().subtract(1, unit).endOf(unit).toISOString();
+  let timeMin = moment().tz("Asia/Tokyo").subtract(1, unit).startOf(unit).toISOString();
+  let timeMax = moment().tz("Asia/Tokyo").subtract(1, unit).endOf(unit).toISOString();
 
   let myArgs = process.argv.slice(2);
-  if (myArgs[0]) timeMin = moment(myArgs[0]).toISOString();
-  if (myArgs[1]) timeMax = moment(myArgs[1]).toISOString();
+  if (myArgs[0]) timeMin = moment(myArgs[0]).tz("Asia/Tokyo").toISOString();
+  if (myArgs[1]) timeMax = moment(myArgs[1]).tz("Asia/Tokyo").toISOString();
 
   return { timeMin, timeMax };
 }
@@ -48,10 +48,10 @@ async function main(userFolderName) {
     jobcan.display(jobcanEvents);
   }
 
-  const question = `Do you want to persist the information into ${output === 'BOTH' ? 'JIRA and JOBCAN' : output}? (y/N) `;
-  const accepted = ['y', 'Y', 'yes'];
-  const shouldPersist = await askIfContinue(question, accepted);
-  if (!shouldPersist) return;
+  // const question = `Do you want to persist the information into ${output === 'BOTH' ? 'JIRA and JOBCAN' : output}? (y/N) `;
+  // const accepted = ['y', 'Y', 'yes'];
+  // const shouldPersist = await askIfContinue(question, accepted);
+  // if (!shouldPersist) return;
 
   switch (output) {
     case 'JOBCAN':
