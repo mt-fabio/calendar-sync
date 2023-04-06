@@ -5,12 +5,8 @@ const YYYYMMDD = 'YYYY-MM-DD';
 const HHmm = 'HH:mm';
 
 const holiday_map = {
-  'PTO': 'Annual leave 年次有給休暇 (Full day)',
-  'PTO-AM': 'Annual leave 年次有給休暇 (AM OFF 午前休)',
-  'PTO-PM': 'Annual leave 年次有給休暇 (PM OFF 午後休)',
-  'SL': 'Sick/Care Leave 傷病/介護 (Full day)',
-  'SL-AM': 'Sick/Care Leave 傷病/介護 (AM OFF)',
-  'SL-PM': 'Sick/Care Leave 傷病/介護 (PM OFF)',
+  'PTO': 'Annual leave',
+  'SL': 'Sick Leave',
 }
 
 function extractVacationType(value) {
@@ -101,7 +97,7 @@ function getWorkingHoursForDay(day) {
   const dayWithoutOutOfOfficeEvents = day.filter((event) => !event.outOfOffice);
   const vacationEvent = day.filter((event) => event.vacation)[0];
 
-  const fullDayOutOfOffice = day.filter((event) => (event.end - event.start) / 1000 / 60 / 60 === 24)[0];
+  const fullDayOutOfOffice = day.filter((event) => (event.end - event.start) / 1000 / 60 / 60 === 24 || (event.end - event.start) / 1000 / 60 / 60 === 8)[0];
   if (!fullDayOutOfOffice && dayWithoutOutOfOfficeEvents.length > 1) {
     const earliestEventOfTheDay = dayWithoutOutOfOfficeEvents.sort((a, b) => a.start - b.start)[0];
     const lastEventOfTheDay = dayWithoutOutOfOfficeEvents.sort((a, b) => b.end - a.end)[0];
@@ -113,12 +109,24 @@ function getWorkingHoursForDay(day) {
       vacationTime = ((vacationEvent.end - vacationEvent.start) / 1000 / 60)
     }
 
+    let vacation = '';
+    if (vacationEvent) {
+      vacation = vacationEvent.vacation
+      const hour = vacationEvent.start.format('HH');
+      ampm = '-AM';
+      if (parseInt(hour) > 12) {
+        ampm = '-PM';
+      }
+
+      vacation += ampm;
+    }
+
     return {
       earliestEvent: earliestEventOfTheDay,
       lastEvent: lastEventOfTheDay,
       clockin: earliestEventOfTheDay.start.format(HHmm),
       clockout: lastEventOfTheDay.end.format(HHmm),
-      vacation: vacationEvent ? vacationEvent.vacation + ' 1/2' : '',
+      vacation: vacation,
       year: earliestEventOfTheDay.start.format('YYYY'),
       month: earliestEventOfTheDay.start.format('MM'),
       day: earliestEventOfTheDay.start.format('DD'),
