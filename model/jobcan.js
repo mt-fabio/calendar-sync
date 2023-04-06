@@ -1,3 +1,4 @@
+const dotenv = require('dotenv');
 const colors = require('colors/safe');
 const moment = require('moment-timezone');
 const holidays = new (require('date-holidays'))();
@@ -15,8 +16,13 @@ const puppeteer = require('puppeteer');
  }
  */
 class Jobcan {
-  constructor() {
-    holidays.init(process.env.HOLIDAY_ZONE || 'JP');
+  constructor(s3, userFolderName) {
+    this.s3 = s3;
+    this.userFolderName = userFolderName;
+    this.ENV_PATH = '.env';
+    this.initEnv().then(() => {
+      holidays.init(process.env.HOLIDAY_ZONE || 'JP')
+    });
     this.LINE_BREAK = '----------------------------------------------------------------------------------------------------';
     this.holiday_map = {
       'PTO': 'Annual leave 年次有給休暇 (Full day)',
@@ -25,6 +31,19 @@ class Jobcan {
       'SL': 'Sick/Care Leave 傷病/介護 (Full day)',
       'SL-AM': 'Sick/Care Leave 傷病/介護 (AM OFF)',
       'SL-PM': 'Sick/Care Leave 傷病/介護 (PM OFF)',
+    }
+  }
+
+
+  async initEnv() {
+    try {
+      const bEnv = await this.s3.downloadFile(this.userFolderName, this.ENV_PATH);
+      const envConfig = dotenv.parse(bEnv);
+      for (const k in envConfig) {
+        process.env[k] = envConfig[k];
+      }
+    } catch (error) {
+      console.log(error);
     }
   }
 

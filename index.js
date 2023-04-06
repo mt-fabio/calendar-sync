@@ -2,8 +2,6 @@ const S3 = require('./s3');
 const s3 = new S3('calendar-sync-bucket');
 
 const { askIfContinue } = require('./lib/ask.js');
-const jobcan = new (require('./model/jobcan.js'))();
-const jira = new (require('./model/jira.js'))();
 const colors = require('colors/safe');
 const moment = require('moment-timezone');
 
@@ -20,14 +18,7 @@ function getDateRange() {
 }
 
 async function main(userFolderName) {
-  const credentialsFileContent = await s3.downloadFile(userFolderName, 'credentials.json');
   const envFileContent = await s3.downloadFile(userFolderName, '.env');
-  const jiraFileContent = await s3.downloadFile(userFolderName, 'jira.json');
-  const eventsFileContent = await s3.downloadFile(userFolderName, 'events.json');
-
-  const credentials = JSON.parse(credentialsFileContent);
-  const jiraConfig = JSON.parse(jiraFileContent);
-  const eventsConfig = JSON.parse(eventsFileContent);
 
   // Load environment variables from the .env file content
   const env = require('dotenv').parse(envFileContent);
@@ -38,8 +29,11 @@ async function main(userFolderName) {
   console.log(colors.bold(`\n🤖 Locale ${moment.locale()}, timezone ${moment().format('Z')}`));
   console.log(colors.bold(`Search between ${colors.blue(timeMin)} and ${colors.blue(timeMax)}`));
 
-  // TODO: support CSV
+  // Instantiate JobCan and Jira classes within the main function and pass them s3 & foldername
+  const jobcan = new (require('./model/jobcan.js'))(s3, userFolderName);
+  const jira = new (require('./model/jira.js'))(s3, userFolderName);
   const input = new (require(`./model/${env.INPUT}.js`))(s3, userFolderName, env);
+
   const inputEvents = await input.getEventList(timeMin, timeMax);
 
   const jiraEvents = await require(`./input/${env.INPUT}.js`)(env.JIRA_STRATEGY, inputEvents);
