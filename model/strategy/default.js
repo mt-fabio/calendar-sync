@@ -22,14 +22,12 @@ function extractVacationType(value) {
 }
 
 function getEventStartDate(event) {
-  console.log("getStart Date: ", moment(event.start.dateTime).tz(process.env.CALENDAR_TIMEZONE))
-  console.log("env variable: ", process.env.CALENDAR_TIMEZONE)
   if (!event.start) {
     return null;
   }
 
   if (event.start.dateTime) {
-    return moment(event.start.dateTime).tz(process.env.CALENDAR_TIMEZONE); // TODO add proper parsing
+    return moment(event.start.dateTime).tz('Asia/Tokyo').format(); // TODO add proper parsing
   }
 
   if (event.start.date) {
@@ -43,14 +41,12 @@ function getEventStartDate(event) {
 }
 
 function getEventEndDate(event) {
-  console.log("getEnd Date: ", moment(event.end.dateTime).tz(process.env.CALENDAR_TIMEZONE))
-  console.log("env variable: ", process.env.CALENDAR_TIMEZONE)
   if (!event.end) {
     return null;
   }
 
   if (event.end.dateTime) {
-    return moment(event.end.dateTime).tz(process.env.CALENDAR_TIMEZONE); // TODO add proper parsing
+    return moment(event.end.dateTime).tz('Asia/Tokyo').format(); // TODO add proper parsing
   }
 
   if (event.end.date) {
@@ -86,7 +82,7 @@ function getEventDays(event) {
 
 function getBreakHoursForDay(startOfDay, endOfDay) {
   let breakTime = 0;
-  const dailyHours = ((endOfDay - startOfDay) / 1000 / 60 / 60) - 1;
+  const dailyHours = ((endOfDay - startOfDay) / 1000 / 60 / 60);
 
   // JobCan's default breaktime logic
   if (dailyHours >= 6 && dailyHours < 7)
@@ -128,13 +124,13 @@ function getWorkingHoursForDay(day) {
     return {
       earliestEvent: earliestEventOfTheDay,
       lastEvent: lastEventOfTheDay,
-      clockin: earliestEventOfTheDay.start.format(HHmm),
-      clockout: lastEventOfTheDay.end.format(HHmm),
-      vacation: vacation,
+      clockin: moment(earliestEventOfTheDay.start).tz('Asia/Tokyo').format(HHmm),
+      clockout: moment(lastEventOfTheDay.end).tz('Asia/Tokyo').format(HHmm),      
+      vacation: vacationEvent ? vacationEvent.vacation : '',
       year: earliestEventOfTheDay.start.format('YYYY'),
       month: earliestEventOfTheDay.start.format('MM'),
       day: earliestEventOfTheDay.start.format('DD'),
-      duration: ((lastEventOfTheDay.end - earliestEventOfTheDay.start) / 1000 / 60) + vacationTime - breaktime,
+      duration: ((lastEventOfTheDay.end - earliestEventOfTheDay.start) / 1000 / 60) - breaktime,
       breaktime:  moment(`2000-01-01 00:00`).minutes(breaktime).format('HH:mm')
     };
   } else {
@@ -146,7 +142,7 @@ function getWorkingHoursForDay(day) {
         lastEvent: null,
         clockin: '--:--',
         clockout: '--:--',
-        vacation: vacationEvent.vacation,
+        vacation: vacationEvent ? vacationEvent.vacation : '',
         year: earliestEventOfTheDay.start.format('YYYY'),
         month: earliestEventOfTheDay.start.format('MM'),
         day: earliestEventOfTheDay.start.format('DD'),

@@ -18,6 +18,7 @@ const chromium = require('@sparticuz/chromium');
  */
 class Jobcan {
   constructor(s3, userFolderName) {
+    moment.tz.setDefault('Asia/Tokyo');
     this.s3 = s3;
     this.userFolderName = userFolderName;
     this.ENV_PATH = '.env';
@@ -61,13 +62,13 @@ class Jobcan {
     let overtime = 0;
     let weekday = 0;
     const FULL_DAY = 480;
-
+  
     console.log(
       colors.bold(`\nJOBCAN`)
     );
     console.log(this.LINE_BREAK);
     for (const [key, value] of Object.entries(events)) {
-      let duration = moment(`2000-01-01 00:00`).minutes(value.duration);
+      let duration = moment(`2000-01-01 00:00`).minutes(value.duration).subtract(value.breaktime, 'minutes'); // corrected
       if (duration.hours() > 9) {
         duration = colors.red(duration.format('HH:mm'));
       } else if (duration.hours() < 7) {
@@ -75,7 +76,7 @@ class Jobcan {
       } else {
         duration = colors.green(duration.format('HH:mm'));
       }
-
+  
       const line = [
         colors.blue(moment(key).format('ddd')),
         moment(key).format('MM-DD'),
@@ -83,32 +84,33 @@ class Jobcan {
         colors.grey(value.clockout),
         colors.grey(value.breaktime),
         duration,
-        colors.yellow(value.vacation)
+        colors.yellow(value.vacation || '')
       ].join('  ');
-
+  
       if (this.isHoliday(moment(key))) {
         console.log(colors.grey(line));
       } else {
         console.log(line);
         weekday += 1;
       }
-      dduration += value.duration;
+      dduration += value.duration - value.breaktime; // corrected
       overtime += value.duration - FULL_DAY;
     }
-
+  
     dduration = moment(`2000-01-01 00:00`).add(dduration / weekday, 'minutes');
-
+  
     let isOvertime = false;
     if (overtime > 0) {
       isOvertime = true;
     }
     const overtimeText = (isOvertime ? '+' : '-') + (moment(`2000-01-01 00:00`).add(Math.abs(overtime), 'minutes')).format('HH:mm');
-
+  
     console.log(this.LINE_BREAK);
     console.log(
       colors.bold(`>Average: ${dduration.format('HH:mm')} ⏱  during ${weekday} weekdays. ${isOvertime ? colors.green(overtimeText) : colors.red(overtimeText)}`)
     );
   }
+  
 
   async clear(page, selector) {
     await page.$eval(selector, el => el.value = '');
@@ -171,7 +173,6 @@ class Jobcan {
     const page = await browser.newPage();
 
     try {
-      console.log("in the try block on jobcan")
       await page.goto('https://id.jobcan.jp/users/sign_in?app_key=atd&lang=ja');
       // Set screen size
       await page.setViewport({width: 1080, height: 1024});

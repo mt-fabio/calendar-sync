@@ -7,8 +7,8 @@ const moment = require('moment-timezone');
 
 function getDateRange() {
   let unit = 'day';
-  let timeMin = moment().subtract(2, unit).startOf(unit).toISOString();
-  let timeMax = moment().subtract(0, unit).endOf(unit).toISOString();
+  let timeMin = moment().tz('Asia/Tokyo').subtract(2, unit).startOf(unit).format();
+  let timeMax = moment().tz('Asia/Tokyo').subtract(0, unit).endOf(unit).format();
 
   let myArgs = process.argv.slice(2);
   if (myArgs[0]) timeMin = moment(myArgs[0]).toISOString();
@@ -26,7 +26,7 @@ async function main(userFolderName) {
   const output = env.OUTPUT.toUpperCase();
   const { timeMin, timeMax } = getDateRange();
 
-  console.log(colors.bold(`\n🤖 Locale ${moment.locale(process.env.CALENDAR_TIMEZONE)}, timezone ${moment().format('Z')}`));
+  console.log(colors.bold(`\n🤖 Locale ${moment.tz(process.env.CALENDAR_TIMEZONE).locale()}, timezone ${moment.tz(process.env.CALENDAR_TIMEZONE).format('Z')}`));
   console.log(colors.bold(`Search between ${colors.blue(timeMin)} and ${colors.blue(timeMax)}`));
 
   // Instantiate JobCan and Jira classes within the main function and pass them s3 & foldername
