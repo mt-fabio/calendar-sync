@@ -161,11 +161,19 @@ class Jobcan {
   }
 
   async persist(events) {
-    const { args, executablePath } = chromium
-    const browser = await puppeteer.launch({ args, executablePath}); // default is true
+    console.log("in persist method in jobcan")
+    const browser = await puppeteer.launch({ 
+      args: chromium.args,
+      defaultViewport: chromium.defaultViewport,
+      executablePath: await chromium.executablePath(),
+      headless: chromium.headless,
+      slowMo: 200 // add a delay of 200 milliseconds
+    });
+    console.log(browser)
     const page = await browser.newPage();
 
     try {
+      console.log("in the try block on jobcan")
       await page.goto('https://id.jobcan.jp/users/sign_in?app_key=atd&lang=ja');
       // Set screen size
       await page.setViewport({width: 1080, height: 1024});
@@ -173,6 +181,7 @@ class Jobcan {
       await page.type('#user_email', process.env.JOBCAN_USERNAME);
       await page.type('#user_password', process.env.JOBCAN_PASSWORD);
       await page.click('#login_button');
+      console.log("button-clicked!")
 
       for (const [key, value] of Object.entries(events)) {
         await page.goto(`https://ssl.jobcan.jp/employee/adit/modify?year=${value.year}&month=${value.month}&day=${value.day}`);
@@ -197,7 +206,7 @@ class Jobcan {
       }
 
     } catch (error) {
-      console.error(error);
+      console.error("Error log: ",error);
     } finally {
       await browser.close();
     }
