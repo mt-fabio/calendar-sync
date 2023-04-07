@@ -10,10 +10,14 @@
     "type": "git",
     "url": "git@github.com:m13/calendar2jobcan.git"
   },
+  "engines": {
+    "node": "16.x"
+  },
   "author": "m13",
   "license": "MIT",
   "dependencies": {
     "@babel/core": "7.13.14",
+    "@sparticuz/chromium": "112.0.2",
     "colors": "1.4.0",
     "csv-parse": "4.15.3",
     "date-holidays": "3.0.1",
@@ -23,7 +27,7 @@
     "moment": "2.29.1",
     "moment-timezone": "0.5.33",
     "node-fetch": "^2.3.0",
-    "puppeteer": "19.8.3"
+    "puppeteer-core": "19.8.0"
   },
   "devDependencies": {
     "husky": "8.0.3",
