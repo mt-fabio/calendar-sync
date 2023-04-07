@@ -2,7 +2,8 @@ const dotenv = require('dotenv');
 const colors = require('colors/safe');
 const moment = require('moment-timezone');
 const holidays = new (require('date-holidays'))();
-const puppeteer = require('puppeteer');
+const puppeteer = require('puppeteer-core');
+const chromium = require('@sparticuz/chromium');
 
 /*
  events = {
@@ -160,7 +161,8 @@ class Jobcan {
   }
 
   async persist(events) {
-    const browser = await puppeteer.launch({headless: false}); // default is true
+    const { args, executablePath } = chromium
+    const browser = await puppeteer.launch({ args, executablePath}); // default is true
     const page = await browser.newPage();
 
     try {
