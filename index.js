@@ -6,13 +6,13 @@ const colors = require('colors/safe');
 const moment = require('moment-timezone');
 
 function getDateRange() {
-  let unit = 'week';
-  let timeMin = moment().tz("Asia/Tokyo").subtract(1, unit).startOf(unit).toISOString();
-  let timeMax = moment().tz("Asia/Tokyo").subtract(1, unit).endOf(unit).toISOString();
+  let unit = 'day';
+  let timeMin = moment().subtract(2, unit).startOf(unit).toISOString();
+  let timeMax = moment().subtract(0, unit).endOf(unit).toISOString();
 
   let myArgs = process.argv.slice(2);
-  if (myArgs[0]) timeMin = moment(myArgs[0]).tz("Asia/Tokyo").toISOString();
-  if (myArgs[1]) timeMax = moment(myArgs[1]).tz("Asia/Tokyo").toISOString();
+  if (myArgs[0]) timeMin = moment(myArgs[0]).toISOString();
+  if (myArgs[1]) timeMax = moment(myArgs[1]).toISOString();
 
   return { timeMin, timeMax };
 }
@@ -26,7 +26,7 @@ async function main(userFolderName) {
   const output = env.OUTPUT.toUpperCase();
   const { timeMin, timeMax } = getDateRange();
 
-  console.log(colors.bold(`\n🤖 Locale ${moment.locale()}, timezone ${moment().format('Z')}`));
+  console.log(colors.bold(`\n🤖 Locale ${moment.locale(process.env.CALENDAR_TIMEZONE)}, timezone ${moment().format('Z')}`));
   console.log(colors.bold(`Search between ${colors.blue(timeMin)} and ${colors.blue(timeMax)}`));
 
   // Instantiate JobCan and Jira classes within the main function and pass them s3 & foldername
@@ -70,6 +70,8 @@ async function main(userFolderName) {
 
 exports.handler = async (event, context) => {
   try {
+    const currentTime = moment().tz('Asia/Tokyo').format();
+    console.log(currentTime);
     const userFolderName = 'brandon_lamb'; // You can pass this value from the Lambda event
     await main(userFolderName);
     return {

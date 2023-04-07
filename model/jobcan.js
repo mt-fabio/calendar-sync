@@ -161,7 +161,6 @@ class Jobcan {
   }
 
   async persist(events) {
-    console.log("in persist method in jobcan")
     const browser = await puppeteer.launch({ 
       args: chromium.args,
       defaultViewport: chromium.defaultViewport,
@@ -169,7 +168,6 @@ class Jobcan {
       headless: chromium.headless,
       slowMo: 200 // add a delay of 200 milliseconds
     });
-    console.log(browser)
     const page = await browser.newPage();
 
     try {
@@ -181,7 +179,6 @@ class Jobcan {
       await page.type('#user_email', process.env.JOBCAN_USERNAME);
       await page.type('#user_password', process.env.JOBCAN_PASSWORD);
       await page.click('#login_button');
-      console.log("button-clicked!")
 
       for (const [key, value] of Object.entries(events)) {
         await page.goto(`https://ssl.jobcan.jp/employee/adit/modify?year=${value.year}&month=${value.month}&day=${value.day}`);

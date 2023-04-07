@@ -22,12 +22,14 @@ function extractVacationType(value) {
 }
 
 function getEventStartDate(event) {
+  console.log("getStart Date: ", moment(event.start.dateTime).tz(process.env.CALENDAR_TIMEZONE))
+  console.log("env variable: ", process.env.CALENDAR_TIMEZONE)
   if (!event.start) {
     return null;
   }
 
   if (event.start.dateTime) {
-    return moment(event.start.dateTime); // TODO add proper parsing
+    return moment(event.start.dateTime).tz(process.env.CALENDAR_TIMEZONE); // TODO add proper parsing
   }
 
   if (event.start.date) {
@@ -41,12 +43,14 @@ function getEventStartDate(event) {
 }
 
 function getEventEndDate(event) {
+  console.log("getEnd Date: ", moment(event.end.dateTime).tz(process.env.CALENDAR_TIMEZONE))
+  console.log("env variable: ", process.env.CALENDAR_TIMEZONE)
   if (!event.end) {
     return null;
   }
 
   if (event.end.dateTime) {
-    return moment(event.end.dateTime); // TODO add proper parsing
+    return moment(event.end.dateTime).tz(process.env.CALENDAR_TIMEZONE); // TODO add proper parsing
   }
 
   if (event.end.date) {
