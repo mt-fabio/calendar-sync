@@ -1,7 +1,9 @@
+const dotenv = require('dotenv');
 const colors = require('colors/safe');
 const moment = require('moment-timezone');
 const holidays = new (require('date-holidays'))();
-const puppeteer = require('puppeteer');
+const puppeteer = require('puppeteer-core');
+const chromium = require('@sparticuz/chromium');
 
 /*
  events = {
@@ -15,16 +17,26 @@ const puppeteer = require('puppeteer');
  }
  */
 class Jobcan {
-  constructor() {
-    holidays.init(process.env.HOLIDAY_ZONE || 'JP');
+  constructor(s3, userFolderName) {
+    this.s3 = s3;
+    this.userFolderName = userFolderName;
+    this.ENV_PATH = '.env';
+    this.initEnv().then(() => {
+      holidays.init(process.env.HOLIDAY_ZONE || 'JP')
+    });
     this.LINE_BREAK = '----------------------------------------------------------------------------------------------------';
-    this.holiday_map = {
-      'PTO': 'Annual leave 年次有給休暇 (Full day)',
-      'PTO-AM': 'Annual leave 年次有給休暇 (AM OFF 午前休)',
-      'PTO-PM': 'Annual leave 年次有給休暇 (PM OFF 午後休)',
-      'SL': 'Sick/Care Leave 傷病/介護 (Full day)',
-      'SL-AM': 'Sick/Care Leave 傷病/介護 (AM OFF)',
-      'SL-PM': 'Sick/Care Leave 傷病/介護 (PM OFF)',
+  }
+
+
+  async initEnv() {
+    try {
+      const bEnv = await this.s3.downloadFile(this.userFolderName, this.ENV_PATH);
+      const envConfig = dotenv.parse(bEnv);
+      for (const k in envConfig) {
+        process.env[k] = envConfig[k];
+      }
+    } catch (error) {
+      console.log(error);
     }
   }
 
@@ -99,52 +111,20 @@ class Jobcan {
     return elements.length > 0;
   }
 
-  async hasRequested(page, date, vacation) {
-    await page.goto(`https://ssl.jobcan.jp/employee/holiday/?search_type=month&month=${date[1]}&year=${date[0]}`);
-    const elements = await page.$x(`//tr[td[contains(text(),"${vacation}")] and td[contains(text(),"${date[1]}/${date[2]}/${date[0]}")]]`);
-    return elements.length > 0;
-  }
-
-  async requestVacation(page, date, vacation) {
-    let holiday_date = date.split('-');
-    if (await this.hasRequested(page, holiday_date, this.holiday_map[vacation])) {
-      console.log(colors.grey(`${date} ${this.holiday_map[vacation]}`)); // already requested
-    } else {
-      await page.goto(`https://ssl.jobcan.jp/employee/holiday/new`);
-      await page.select('#holiday_id', this.holiday_map[vacation]);
-
-      let selectElem = await page.$('#holiday_id');
-      await selectElem.type(this.holiday_map[vacation]);
-
-      selectElem = await page.$('#holiday_month');
-      await selectElem.type(holiday_date[1]);
-      selectElem = await page.$('#to_holiday_month');
-      await selectElem.type(holiday_date[1]);
-
-      selectElem = await page.$('#holiday_day');
-      await selectElem.type(holiday_date[2]);
-      selectElem = await page.$('#to_holiday_day');
-      await selectElem.type(holiday_date[2]);
-
-      selectElem = await page.$('#holiday_year');
-      await selectElem.type(holiday_date[0]);
-      selectElem = await page.$('#to_holiday_year');
-      await selectElem.type(holiday_date[0]);
-
-      const submit = await page.$x('//div//input[@type="button" and @class="btn jbc-btn-primary"]');
-      console.log(submit[0]);
-
-      await submit[0].click();
-
-      console.log(colors.blue(`${date} ${this.holiday_map[vacation]}`));
-    }
-  }
-
   async persist(events) {
-    const browser = await puppeteer.launch({headless: false}); // default is true
+    console.log("in persist method in jobcan")
+    const browser = await puppeteer.launch({ 
+      args: chromium.args,
+      defaultViewport: chromium.defaultViewport,
+      executablePath: await chromium.executablePath(),
+      headless: chromium.headless,
+      slowMo: 200 // add a delay of 200 milliseconds
+    });
+    console.log(browser)
     const page = await browser.newPage();
 
     try {
+      console.log("in the try block on jobcan")
       await page.goto('https://id.jobcan.jp/users/sign_in?app_key=atd&lang=ja');
       // Set screen size
       await page.setViewport({width: 1080, height: 1024});
@@ -152,12 +132,13 @@ class Jobcan {
       await page.type('#user_email', process.env.JOBCAN_USERNAME);
       await page.type('#user_password', process.env.JOBCAN_PASSWORD);
       await page.click('#login_button');
+      console.log("button-clicked!")
 
       for (const [key, value] of Object.entries(events)) {
         await page.goto(`https://ssl.jobcan.jp/employee/adit/modify?year=${value.year}&month=${value.month}&day=${value.day}`);
 
         if (!await this.exists(page, '//tr[@class="text-center"]//td[contains(., "Clock-in") or contains(., "Clock In")]')) {
-          if (!await this.exists(page, '//form[@id="modifyForm"]//div[contains(., "Cannot revise clock time on this day")]') && value.vacation === '') {
+          if (!await this.exists(page, '//form[@id="modifyForm"]//div[contains(., "Cannot revise clock time on this day")]')) {
             console.log(colors.blue(`${key} ${value.clockin} ~ ${value.clockout}`));
 
             // Clock-In
@@ -169,14 +150,12 @@ class Jobcan {
             await this.clear(page, '#ter_time');
             await page.type('#ter_time', value.clockout.replace(':', ''));
             await page.evaluate(()=>document.querySelector('#insert_button').click());
-          } else if (this.holiday_map[value.vacation]) {
-            await this.requestVacation(page, key, value.vacation);
           }
         }
       }
 
     } catch (error) {
-      console.error(error);
+      console.error("Error log: ",error);
     } finally {
       await browser.close();
     }

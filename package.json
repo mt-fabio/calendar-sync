@@ -10,6 +10,9 @@
     "type": "git",
     "url": "git@github.com:m13/calendar2jobcan.git"
   },
+  "engines": {
+    "node": "16.x"
+  },
   "author": "m13",
   "license": "MIT",
   "dependencies": {
