@@ -82,7 +82,7 @@ function getEventDays(event) {
 
 function getBreakHoursForDay(startOfDay, endOfDay) {
   let breakTime = 0;
-  const dailyHours = ((endOfDay - startOfDay) / 1000 / 60 / 60);
+  const dailyHours = ((endOfDay - startOfDay) / 1000 / 60 / 60) - 1;
 
   // JobCan's default breaktime logic
   if (dailyHours >= 6 && dailyHours < 7)
@@ -126,11 +126,11 @@ function getWorkingHoursForDay(day) {
       lastEvent: lastEventOfTheDay,
       clockin: moment(earliestEventOfTheDay.start).tz('Asia/Tokyo').format(HHmm),
       clockout: moment(lastEventOfTheDay.end).tz('Asia/Tokyo').format(HHmm),      
-      vacation: vacationEvent ? vacationEvent.vacation : '',
+      vacation: vacation,
       year: earliestEventOfTheDay.start.format('YYYY'),
       month: earliestEventOfTheDay.start.format('MM'),
       day: earliestEventOfTheDay.start.format('DD'),
-      duration: ((lastEventOfTheDay.end - earliestEventOfTheDay.start) / 1000 / 60) - breaktime,
+      duration: ((lastEventOfTheDay.end - earliestEventOfTheDay.start) / 1000 / 60) + vacationTime - breaktime,
       breaktime:  moment(`2000-01-01 00:00`).minutes(breaktime).format('HH:mm')
     };
   } else {
@@ -142,7 +142,7 @@ function getWorkingHoursForDay(day) {
         lastEvent: null,
         clockin: '--:--',
         clockout: '--:--',
-        vacation: vacationEvent ? vacationEvent.vacation : '',
+        vacation: vacationEvent.vacation,
         year: earliestEventOfTheDay.start.format('YYYY'),
         month: earliestEventOfTheDay.start.format('MM'),
         day: earliestEventOfTheDay.start.format('DD'),

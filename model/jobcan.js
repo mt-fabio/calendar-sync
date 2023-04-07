@@ -168,7 +168,7 @@ class Jobcan {
       defaultViewport: chromium.defaultViewport,
       executablePath: await chromium.executablePath(),
       headless: chromium.headless,
-      slowMo: 200 // add a delay of 200 milliseconds
+      slowMo: 400 // add a delay of 400 milliseconds
     });
     const page = await browser.newPage();
 
