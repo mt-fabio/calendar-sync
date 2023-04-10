@@ -27,7 +27,7 @@ function getEventStartDate(event) {
   }
 
   if (event.start.dateTime) {
-    return moment(event.start.dateTime); // TODO add proper parsing
+    return moment(event.start.dateTime).tz('Asia/Tokyo').format(); // TODO add proper parsing
   }
 
   if (event.start.date) {
@@ -46,7 +46,7 @@ function getEventEndDate(event) {
   }
 
   if (event.end.dateTime) {
-    return moment(event.end.dateTime); // TODO add proper parsing
+    return moment(event.end.dateTime).tz('Asia/Tokyo').format(); // TODO add proper parsing
   }
 
   if (event.end.date) {
@@ -124,8 +124,8 @@ function getWorkingHoursForDay(day) {
     return {
       earliestEvent: earliestEventOfTheDay,
       lastEvent: lastEventOfTheDay,
-      clockin: earliestEventOfTheDay.start.format(HHmm),
-      clockout: lastEventOfTheDay.end.format(HHmm),
+      clockin: moment(earliestEventOfTheDay.start).tz('Asia/Tokyo').format(HHmm),
+      clockout: moment(lastEventOfTheDay.end).tz('Asia/Tokyo').format(HHmm),      
       vacation: vacation,
       year: earliestEventOfTheDay.start.format('YYYY'),
       month: earliestEventOfTheDay.start.format('MM'),

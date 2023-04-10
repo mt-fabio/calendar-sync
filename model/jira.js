@@ -9,7 +9,9 @@ const JapaneseHolidays = require('japanese-holidays');
 // Get API Key
 // https://id.atlassian.com/manage-profile/security/api-tokens
 class Jira {
-  constructor() {
+  constructor(s3, userFolderName) {
+    this.s3 = s3;
+    this.userFolderName = userFolderName;
     this.CREDENTIAL_PATH = 'jira.json';
     this.EVENTS_PATH = 'events.json';
     this.LINE_BREAK = '----------------------------------------------------------------------------------------------------';
@@ -61,7 +63,7 @@ class Jira {
   async getSavedEvents() {
     let bPersistedEvents;
     try {
-      bPersistedEvents = await fs.readFile(this.EVENTS_PATH);
+      bPersistedEvents = await this.s3.downloadFile(this.userFolderName, this.EVENTS_PATH);
     } catch (error) {}
 
     return bPersistedEvents
@@ -70,7 +72,7 @@ class Jira {
   }
 
   async saveEvents(events) {
-    await fs.writeFile(this.EVENTS_PATH, JSON.stringify(events));
+    await this.s3.uploadFile(this.userFolderName, this.EVENTS_PATH, JSON.stringify(events));
   }
 
   getBody(jiraEvent) {
@@ -99,7 +101,7 @@ class Jira {
   async updateWorklog(jiraWorklogId, jiraEvent) {
     let credential;
     try {
-      const bToken = await fs.readFile(this.CREDENTIAL_PATH);
+      const bToken = await this.s3.downloadFile(this.userFolderName, this.CREDENTIAL_PATH);
       credential = JSON.parse(bToken.toString('utf8'));
     } catch (error) {
       console.log(error);
@@ -128,7 +130,7 @@ class Jira {
   async addWorklog(jiraEvent) {
     let credential;
     try {
-      const bToken = await fs.readFile(this.CREDENTIAL_PATH);
+      const bToken = await this.s3.downloadFile(this.userFolderName, this.CREDENTIAL_PATH);
       credential = JSON.parse(bToken.toString('utf8'));
     } catch (error) {
       console.log(error);

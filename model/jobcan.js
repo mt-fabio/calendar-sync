@@ -1,7 +1,9 @@
+const dotenv = require('dotenv');
 const colors = require('colors/safe');
 const moment = require('moment-timezone');
 const holidays = new (require('date-holidays'))();
-const puppeteer = require('puppeteer');
+const puppeteer = require('puppeteer-core');
+const chromium = require('@sparticuz/chromium');
 
 /*
  events = {
@@ -15,8 +17,14 @@ const puppeteer = require('puppeteer');
  }
  */
 class Jobcan {
-  constructor() {
-    holidays.init(process.env.HOLIDAY_ZONE || 'JP');
+  constructor(s3, userFolderName) {
+    moment.tz.setDefault('Asia/Tokyo');
+    this.s3 = s3;
+    this.userFolderName = userFolderName;
+    this.ENV_PATH = '.env';
+    this.initEnv().then(() => {
+      holidays.init(process.env.HOLIDAY_ZONE || 'JP')
+    });
     this.LINE_BREAK = '----------------------------------------------------------------------------------------------------';
     this.holiday_map = {
       'PTO': 'Annual leave 年次有給休暇 (Full day)',
@@ -25,6 +33,19 @@ class Jobcan {
       'SL': 'Sick/Care Leave 傷病/介護 (Full day)',
       'SL-AM': 'Sick/Care Leave 傷病/介護 (AM OFF)',
       'SL-PM': 'Sick/Care Leave 傷病/介護 (PM OFF)',
+    }
+  }
+
+
+  async initEnv() {
+    try {
+      const bEnv = await this.s3.downloadFile(this.userFolderName, this.ENV_PATH);
+      const envConfig = dotenv.parse(bEnv);
+      for (const k in envConfig) {
+        process.env[k] = envConfig[k];
+      }
+    } catch (error) {
+      console.log(error);
     }
   }
 
@@ -41,13 +62,13 @@ class Jobcan {
     let overtime = 0;
     let weekday = 0;
     const FULL_DAY = 480;
-
+  
     console.log(
       colors.bold(`\nJOBCAN`)
     );
     console.log(this.LINE_BREAK);
     for (const [key, value] of Object.entries(events)) {
-      let duration = moment(`2000-01-01 00:00`).minutes(value.duration);
+      let duration = moment(`2000-01-01 00:00`).minutes(value.duration).subtract(value.breaktime, 'minutes'); // corrected
       if (duration.hours() > 9) {
         duration = colors.red(duration.format('HH:mm'));
       } else if (duration.hours() < 7) {
@@ -55,7 +76,7 @@ class Jobcan {
       } else {
         duration = colors.green(duration.format('HH:mm'));
       }
-
+  
       const line = [
         colors.blue(moment(key).format('ddd')),
         moment(key).format('MM-DD'),
@@ -63,32 +84,33 @@ class Jobcan {
         colors.grey(value.clockout),
         colors.grey(value.breaktime),
         duration,
-        colors.yellow(value.vacation)
+        colors.yellow(value.vacation || '')
       ].join('  ');
-
+  
       if (this.isHoliday(moment(key))) {
         console.log(colors.grey(line));
       } else {
         console.log(line);
         weekday += 1;
       }
-      dduration += value.duration;
+      dduration += value.duration - value.breaktime; // corrected
       overtime += value.duration - FULL_DAY;
     }
-
+  
     dduration = moment(`2000-01-01 00:00`).add(dduration / weekday, 'minutes');
-
+  
     let isOvertime = false;
     if (overtime > 0) {
       isOvertime = true;
     }
     const overtimeText = (isOvertime ? '+' : '-') + (moment(`2000-01-01 00:00`).add(Math.abs(overtime), 'minutes')).format('HH:mm');
-
+  
     console.log(this.LINE_BREAK);
     console.log(
       colors.bold(`>Average: ${dduration.format('HH:mm')} ⏱  during ${weekday} weekdays. ${isOvertime ? colors.green(overtimeText) : colors.red(overtimeText)}`)
     );
   }
+  
 
   async clear(page, selector) {
     await page.$eval(selector, el => el.value = '');
@@ -141,7 +163,13 @@ class Jobcan {
   }
 
   async persist(events) {
-    const browser = await puppeteer.launch({headless: false}); // default is true
+    const browser = await puppeteer.launch({ 
+      args: chromium.args,
+      defaultViewport: chromium.defaultViewport,
+      executablePath: await chromium.executablePath(),
+      headless: chromium.headless,
+      slowMo: 400 // add a delay of 400 milliseconds
+    });
     const page = await browser.newPage();
 
     try {
@@ -176,7 +204,7 @@ class Jobcan {
       }
 
     } catch (error) {
-      console.error(error);
+      console.error("Error log: ",error);
     } finally {
       await browser.close();
     }

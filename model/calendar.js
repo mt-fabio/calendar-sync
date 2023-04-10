@@ -2,8 +2,9 @@ const { google } = require('googleapis');
 const Google = require('./google.js');
 
 class Calendar extends Google {
-  constructor() {
-    super();
+  constructor(s3, userFolderName, env) {
+    super(s3, userFolderName);
+    this.env = env;
   }
 
   async retrieveEvents(timeMin, timeMax) {
@@ -16,7 +17,7 @@ class Calendar extends Google {
       maxResults: 2500,
       singleEvents: true,
       showDeleted: false,
-      timeZone: process.env.CALENDAR_TIMEZONE || 'Asia/Tokyo',
+      timeZone: this.env.CALENDAR_TIMEZONE || 'Asia/Tokyo',
       showHiddenInvitations: true,
       orderBy: 'startTime',
     });
