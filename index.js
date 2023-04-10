@@ -25,7 +25,6 @@ async function main() {
   console.log(colors.bold(`\n🤖 Locale ${moment.locale()}, timezone ${moment().format('Z')}`));
   console.log(colors.bold(`Search between ${colors.blue(timeMin)} and ${colors.blue(timeMax)}`));
 
-  // TODO: support CSV
   const input = new (require(`./model/${process.env.INPUT}.js`))();
   const inputEvents = await input.getEventList(timeMin, timeMax);
 
@@ -57,7 +56,7 @@ async function main() {
       await jira.persist(jiraEvents);
       await jobcan.persist(jobcanEvents);
     default:
-      console.log('\n');
+      console.log('');
   }
 }
 
