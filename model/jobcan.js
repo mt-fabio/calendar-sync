@@ -100,8 +100,13 @@ class Jobcan {
   }
 
   async hasRequested(page, date, vacation) {
-    await page.goto(`https://ssl.jobcan.jp/employee/holiday/?search_type=month&month=${date[1]}&year=${date[0]}`);
-    const elements = await page.$x(`//tr[td[contains(text(),"${vacation}")] and td[contains(text(),"${date[1]}/${date[2]}/${date[0]}")]]`);
+    await Promise.all([
+      page.goto(`https://ssl.jobcan.jp/employee/holiday/?search_type=month&month=${date[1]}&year=${date[0]}`),
+      page.waitForNavigation(),
+    ]);
+
+    const requestedXpath = `//tr[td[contains(text(),"${vacation}")] and td[contains(text(),"${date[1]}/${date[2]}/${date[0]}")]]`;
+    const elements = await page.$x(requestedXpath);
     return elements.length > 0;
   }
 
@@ -111,27 +116,22 @@ class Jobcan {
       console.log(colors.grey(`${date} ${this.holiday_map[vacation]}`)); // already requested
     } else {
       await page.goto(`https://ssl.jobcan.jp/employee/holiday/new`);
-      await page.select('#holiday_id', this.holiday_map[vacation]);
 
-      let selectElem = await page.$('#holiday_id');
+      const selectElem = await page.$('#holiday_id');
       await selectElem.type(this.holiday_map[vacation]);
 
-      selectElem = await page.$('#holiday_month');
-      await selectElem.type(holiday_date[1]);
-      selectElem = await page.$('#to_holiday_month');
-      await selectElem.type(holiday_date[1]);
+      // Month is the only one that only works this way. No idea why.
+      const holidayMonthSelect = await page.$('#holiday_month');
+      await holidayMonthSelect.type(holiday_date[1]);
+      const holidayToMonthSelect = await page.$('#to_holiday_month');
+      await holidayToMonthSelect.type(holiday_date[1]);
 
-      selectElem = await page.$('#holiday_day');
-      await selectElem.type(holiday_date[2]);
-      selectElem = await page.$('#to_holiday_day');
-      await selectElem.type(holiday_date[2]);
+      await page.select('#holiday_day', holiday_date[2]);
+      await page.select('#to_holiday_day', holiday_date[2]);
+      await page.select('#holiday_year', holiday_date[0]);
+      await page.select('#to_holiday_year', holiday_date[0]);
 
-      selectElem = await page.$('#holiday_year');
-      await selectElem.type(holiday_date[0]);
-      selectElem = await page.$('#to_holiday_year');
-      await selectElem.type(holiday_date[0]);
-
-      // submit form amd wait for navigation to a new page
+      // Submit form and wait for navigation to a new page
       const submit = await page.$x('//div//input[@type="button" and @class="btn jbc-btn-primary"]');
       await Promise.all([
         submit[0].click(),
@@ -139,7 +139,10 @@ class Jobcan {
       ]);
 
       const submit2 = await page.$x('//div//input[@type="button" and @class="btn jbc-btn-secondary"]');
-      submit2[0].click()
+      await Promise.all([
+        submit2[0].click(),
+        page.waitForNavigation(),
+      ]);
 
       console.log(colors.blue(`${date} ${this.holiday_map[vacation]}`));
     }
@@ -162,7 +165,7 @@ class Jobcan {
         await page.goto(`https://ssl.jobcan.jp/employee/adit/modify?year=${value.year}&month=${value.month}&day=${value.day}`);
 
         if (!await this.exists(page, '//tr[@class="text-center"]//td[contains(., "Clock-in") or contains(., "Clock In")]')) {
-          if (!await this.exists(page, '//form[@id="modifyForm"]//div[contains(., "Cannot revise clock time on this day")]') && value.vacation === '') {
+          if (!await this.exists(page, '//form[@id="modifyForm"]//div[contains(., "Cannot revise clock time on this day")]') && value.clockin !== '--:--' && value.clockout !== '--:--') {
             console.log(colors.blue(`${key} ${value.clockin} ~ ${value.clockout}`));
 
             // Clock-In
@@ -175,15 +178,14 @@ class Jobcan {
             await page.type('#ter_time', value.clockout.replace(':', ''));
             await page.evaluate(()=>document.querySelector('#insert_button').click());
           }
+
+          if (this.holiday_map[value.vacation]) {
+            await this.requestVacation(page, key, value.vacation);
+          }
         } else {
           console.log(colors.grey(`${key} ${value.clockin} ~ ${value.clockout}`));
         }
-
-        if (this.holiday_map[value.vacation]) {
-          await this.requestVacation(page, key, value.vacation);
-        }
       }
-
     } catch (error) {
       console.error(error);
     } finally {
