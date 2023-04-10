@@ -131,10 +131,15 @@ class Jobcan {
       selectElem = await page.$('#to_holiday_year');
       await selectElem.type(holiday_date[0]);
 
+      // submit form amd wait for navigation to a new page
       const submit = await page.$x('//div//input[@type="button" and @class="btn jbc-btn-primary"]');
-      console.log(submit[0]);
+      await Promise.all([
+        submit[0].click(),
+        page.waitForNavigation(),
+      ]);
 
-      await submit[0].click();
+      const submit2 = await page.$x('//div//input[@type="button" and @class="btn jbc-btn-secondary"]');
+      submit2[0].click()
 
       console.log(colors.blue(`${date} ${this.holiday_map[vacation]}`));
     }
@@ -169,9 +174,13 @@ class Jobcan {
             await this.clear(page, '#ter_time');
             await page.type('#ter_time', value.clockout.replace(':', ''));
             await page.evaluate(()=>document.querySelector('#insert_button').click());
-          } else if (this.holiday_map[value.vacation]) {
-            await this.requestVacation(page, key, value.vacation);
           }
+        } else {
+          console.log(colors.grey(`${key} ${value.clockin} ~ ${value.clockout}`));
+        }
+
+        if (this.holiday_map[value.vacation]) {
+          await this.requestVacation(page, key, value.vacation);
         }
       }
 

@@ -192,6 +192,8 @@ class Jira {
                 console.log(colors.green(`${worklog.id}: ${worklog.description}`));
                 // returns jiraEvent with the new worklog ID
                 worklog = await this.updateWorklog(savedWorklog.jiraWorklogId, worklog);
+              } else {
+                console.log(colors.grey(`${worklog.id}: ${worklog.description}`));
               }
 
               break;
