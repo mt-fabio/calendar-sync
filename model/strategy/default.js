@@ -114,7 +114,7 @@ function getWorkingHoursForDay(day) {
       vacation = vacationEvent.vacation
       const hour = vacationEvent.start.format('HH');
       ampm = '-AM';
-      if (parseInt(hour) > 12) {
+      if (parseInt(hour) >= 12) {
         ampm = '-PM';
       }
 
