@@ -19,12 +19,12 @@ class Jobcan {
     holidays.init(process.env.HOLIDAY_ZONE || 'JP');
     this.LINE_BREAK = '----------------------------------------------------------------------------------------------------';
     this.holiday_map = {
-      'PTO': 'Annual leave 年次有給休暇 (Full day)',
-      'PTO-AM': 'Annual leave 年次有給休暇 (AM OFF 午前休)',
-      'PTO-PM': 'Annual leave 年次有給休暇 (PM OFF 午後休)',
-      'SL': 'Sick/Care Leave 傷病/介護 (Full day)',
-      'SL-AM': 'Sick/Care Leave 傷病/介護 (AM OFF)',
-      'SL-PM': 'Sick/Care Leave 傷病/介護 (PM OFF)',
+      'PTO': { code: '79', text: 'Annual leave 年次有給休暇 (Full day)'},
+      'PTO-AM': {code: '92', text: 'Annual leave 年次有給休暇 (AM OFF 午前休)'},
+      'PTO-PM': {code: '93', text: 'Annual leave 年次有給休暇 (PM OFF 午後休)'},
+      'SL': {code: '77', text: 'Sick/Care Leave 傷病/介護 (Full day)'},
+      'SL-AM': {code: '96', text: 'Sick/Care Leave 傷病/介護 (AM OFF)'},
+      'SL-PM': {code: '97', text: 'Sick/Care Leave 傷病/介護 (PM OFF)'},
     }
   }
 
@@ -113,18 +113,18 @@ class Jobcan {
   async requestVacation(page, date, vacation) {
     let holiday_date = date.split('-');
     if (await this.hasRequested(page, holiday_date, this.holiday_map[vacation])) {
-      console.log(colors.grey(`${date} ${this.holiday_map[vacation]}`)); // already requested
+      console.log(colors.grey(`${date} ${this.holiday_map[vacation].text}`)); // already requested
     } else {
       await page.goto(`https://ssl.jobcan.jp/employee/holiday/new`);
-
-      const selectElem = await page.$('#holiday_id');
-      await selectElem.type(this.holiday_map[vacation]);
+      await page.select('#holiday_id', this.holiday_map[vacation].code);
 
       // Month is the only one that only works this way. No idea why.
       const holidayMonthSelect = await page.$('#holiday_month');
       await holidayMonthSelect.type(holiday_date[1]);
       const holidayToMonthSelect = await page.$('#to_holiday_month');
       await holidayToMonthSelect.type(holiday_date[1]);
+      // await page.select('#holiday_month', holiday_date[1]);
+      // await page.select('#to_holiday_month', holiday_date[1]);
 
       await page.select('#holiday_day', holiday_date[2]);
       await page.select('#to_holiday_day', holiday_date[2]);
@@ -144,7 +144,7 @@ class Jobcan {
         page.waitForNavigation(),
       ]);
 
-      console.log(colors.blue(`${date} ${this.holiday_map[vacation]}`));
+      console.log(colors.blue(`${date} ${this.holiday_map[vacation].text}`));
     }
   }
 
