@@ -155,10 +155,11 @@ class Jobcan {
     try {
       await page.goto('https://id.jobcan.jp/users/sign_in?app_key=atd&lang=ja');
       // Set screen size
-      await page.setViewport({width: 1080, height: 1024});
+      await page.setViewport({width: 1080, height: 720});
 
       await page.type('#user_email', process.env.JOBCAN_USERNAME);
       await page.type('#user_password', process.env.JOBCAN_PASSWORD);
+
       await page.click('#login_button');
 
       for (const [key, value] of Object.entries(events)) {
