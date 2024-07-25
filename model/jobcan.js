@@ -152,7 +152,7 @@ class Jobcan {
 
       // Submit form and wait for navigation to a new page
       const submit = await page.$x(
-        '//div//input[@type="button" and @class="btn jbc-btn-primary"]'
+        '//div//input[@type="submit" and @class="btn jbc-btn-primary"]'
       );
       await Promise.all([submit[0].click(), page.waitForNavigation()]);
 
