@@ -110,8 +110,11 @@ class Jobcan {
   }
 
   async exists(page, xpath) {
-    const elements = await page.$x(xpath);
-    return elements.length > 0;
+    const elements = await page.evaluate((xpath) => {
+      const result = document.evaluate(xpath, document, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
+      return result.snapshotLength;
+    }, xpath);
+    return elements > 0;
   }
 
   async hasRequested(page, date, vacation) {
@@ -178,8 +181,8 @@ class Jobcan {
       await page.click('#login_button');
 
       // Wait for navigation after login
-      await page.waitForNavigation();
-
+      await page.waitForSelector('#working_status', { visible: true });
+      
       for (const [key, value] of Object.entries(events)) {
         await page.goto(
           `https://ssl.jobcan.jp/employee/adit/modify?year=${value.year}&month=${value.month}&day=${value.day}`
@@ -187,9 +190,9 @@ class Jobcan {
 
         // Wait for the #ter_time element to appear
         await page.waitForSelector('#ter_time', { visible: true });
-
+        
         // Add a delay after navigation
-        await page.waitForTimeout(1000); // Wait for 1 second
+        await new Promise(resolve => setTimeout(resolve, 1000));
 
         if (
           !(await this.exists(
@@ -217,7 +220,7 @@ class Jobcan {
             );
 
             // Add a delay between actions
-            await page.waitForTimeout(1000); // Wait for 1 second
+            await new Promise(resolve => setTimeout(resolve, 1000));
 
             // Clock-Out
             await this.clear(page, '#ter_time');
@@ -227,7 +230,7 @@ class Jobcan {
             );
 
             // Add a delay before moving to the next entry
-            await page.waitForTimeout(1000); // Wait for 1 second
+            await new Promise(resolve => setTimeout(resolve, 1000));
           }
 
           if (this.holiday_map[value.vacation]) {

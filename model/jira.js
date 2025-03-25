@@ -4,6 +4,9 @@ const colors = require('colors/safe');
 const fs = require('fs').promises;
 const JapaneseHolidays = require('japanese-holidays');
 
+//jira will return this message if the token is invalid
+const INVALID_CREDS_MSG = 'Issue does not exist or you do not have permission to see it.';
+
 // Jira API Documentation
 // https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-issue-worklogs/#api-rest-api-3-issue-issueidorkey-worklog-post
 // Get API Key
@@ -96,13 +99,29 @@ class Jira {
     return bodyString;
   }
 
+  
+  checkResponse(responseJson) {
+
+    //Check for errors in the response
+    if (responseJson?.errorMessages !== undefined && responseJson?.errorMessages.length > 0) {
+
+      //We know the response we get for bad credentials, so we can check for that specifically
+      console.log(colors.red(responseJson.errorMessages.some(m => m === INVALID_CREDS_MSG)
+      ? 'Invalid JIRA credentials, please check your jira.json'
+      : 'Failed to add worklog to jira: ' + responseJson.errorMessages));
+
+      //Throw an error to stop the job early
+      throw new Error('Failed to add worklog to jira. Exiting Job');
+    }
+  }
+
   async updateWorklog(jiraWorklogId, jiraEvent) {
     let credential;
     try {
       const bToken = await fs.readFile(this.CREDENTIAL_PATH);
       credential = JSON.parse(bToken.toString('utf8'));
     } catch (error) {
-      console.log(error);
+      console.log(error);      
       return;
     }
     const jiraRequestUrl = `${credential.domainUrl}/rest/api/3/issue/${jiraEvent.id}/worklog/${jiraWorklogId}`;
@@ -120,6 +139,8 @@ class Jira {
 
     const response = await fetch(jiraRequestUrl, jiraRequestPayload);
     const responseJson = await response.json();
+
+    this.checkResponse(responseJson);
 
     jiraEvent.jiraWorklogId = jiraWorklogId;
     return jiraEvent;
@@ -150,6 +171,8 @@ class Jira {
 
     const response = await fetch(jiraRequestUrl, jiraRequestPayload);
     const responseJson = await response.json();
+    
+    this.checkResponse(responseJson);
 
     jiraEvent.jiraWorklogId = responseJson.id;
     return jiraEvent;
