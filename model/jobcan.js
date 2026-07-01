@@ -138,7 +138,8 @@ class Jobcan {
       console.log(colors.grey(`${date} ${this.holiday_map[vacation].text}`)); // already requested
     } else {
       await page.goto(`https://ssl.jobcan.jp/employee/holiday/new`);
-      await page.select('#holiday_id', this.holiday_map[vacation].code);
+      await page.waitForSelector('select.holiday_id', { visible: true });
+      await page.select('select.holiday_id', this.holiday_map[vacation].code);
 
       // Month is the only one that only works this way. No idea why.
       const holidayMonthSelect = await page.$('#holiday_month');
