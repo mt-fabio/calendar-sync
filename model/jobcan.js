@@ -2,6 +2,7 @@ const colors = require('colors/safe');
 const moment = require('moment-timezone');
 const holidays = new (require('date-holidays'))();
 const puppeteer = require('puppeteer');
+const { holidayMap } = require('./holidayConfig');
 
 /*
  events = {
@@ -19,20 +20,7 @@ class Jobcan {
     holidays.init(process.env.HOLIDAY_ZONE || 'JP');
     this.LINE_BREAK =
       '----------------------------------------------------------------------------------------------------';
-    this.holiday_map = {
-      PTO: { code: '79', text: 'Annual leave 年次有給休暇 (Full day)' },
-      'PTO-AM': {
-        code: '92',
-        text: 'Annual leave 年次有給休暇 (AM OFF 午前休)',
-      },
-      'PTO-PM': {
-        code: '93',
-        text: 'Annual leave 年次有給休暇 (PM OFF 午後休)',
-      },
-      SL: { code: '77', text: 'Sick/Care Leave 傷病/介護 (Full day)' },
-      'SL-AM': { code: '96', text: 'Sick/Care Leave 傷病/介護 (AM OFF)' },
-      'SL-PM': { code: '97', text: 'Sick/Care Leave 傷病/介護 (PM OFF)' },
-    };
+    this.holiday_map = holidayMap;
   }
 
   // best effort!

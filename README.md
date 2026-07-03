@@ -90,6 +90,13 @@ To register leave, create an **Out of Office** event in Google Calendar and put
 required — a normal event with the tag, or an Out of Office event without the
 tag, is *not* treated as leave.
 
+The leave types (tags, Jobcan codes and labels) are configurable per company in
+`holidays.json`. The `code` is the value of the option in Jobcan's holiday-type
+dropdown (`select.holiday_id` on `https://ssl.jobcan.jp/employee/holiday/new`;
+inspect it to find your codes). The tags recognized in calendar titles are
+derived from this file's keys, so adding a new leave type only needs an entry
+here.
+
 The length of the event decides how it is booked:
 
 - **≥ 8 hours** (or an **all-day** event) → **full day** off.

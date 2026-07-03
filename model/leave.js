@@ -5,11 +5,10 @@
 // BOTH conditions are required. An untagged OOO event, or a tagged event that
 // is not OOO, is not leave.
 const moment = require('moment-timezone');
+const { leaveTypes: LEAVE_TYPES } = require('./holidayConfig');
 
 const YYYYMMDD = 'YYYY-MM-DD';
 const FULL_DAY_HOURS = 8; // a timed leave >= 8h is a full day, otherwise a half day
-
-const LEAVE_TYPES = ['PTO', 'SL'];
 
 function extractLeaveType(value) {
   const regex = /[\[{]([a-zA-Z]+)[\]}]/;
