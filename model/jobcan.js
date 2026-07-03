@@ -113,15 +113,16 @@ class Jobcan {
     return elements > 0;
   }
 
-  async hasRequested(page, date, vacation) {
+  async hasRequested(page, date, vacationText) {
     await Promise.all([
       page.goto(
-        `https://ssl.jobcan.jp/employee/holiday/?search_type=month&month=${date[1]}&year=${date[0]}`
+        `https://ssl.jobcan.jp/employee/holiday/?search_type=month&month=${parseInt(date[1], 10)}&year=${date[0]}`
       ),
       page.waitForNavigation(),
     ]);
 
-    const requestedXpath = `//tr[td[contains(text(),"${vacation}")] and td[contains(text(),"${date[1]}/${date[2]}/${date[0]}")]]`;
+    // The list renders the vacation label and a padded date (e.g. 07/02/2026).
+    const requestedXpath = `//tr[td[contains(text(),"${vacationText}")] and td[contains(text(),"${date[1]}/${date[2]}/${date[0]}")]]`;
     const elements = await page.$x(requestedXpath);
     return elements.length > 0;
   }
@@ -129,7 +130,7 @@ class Jobcan {
   async requestVacation(page, date, vacation) {
     let holiday_date = date.split('-');
     if (
-      await this.hasRequested(page, holiday_date, this.holiday_map[vacation])
+      await this.hasRequested(page, holiday_date, this.holiday_map[vacation].text)
     ) {
       console.log(colors.grey(`${date} ${this.holiday_map[vacation].text}`)); // already requested
     } else {
@@ -155,12 +156,16 @@ class Jobcan {
       const submit = await page.$x(
         '//div//input[@type="submit" and @class="btn jbc-btn-primary"]'
       );
-      await Promise.all([submit[0].click(), page.waitForNavigation()]);
+      if (submit[0]) {
+        await Promise.all([submit[0].click(), page.waitForNavigation()]);
+      }
 
       const submit2 = await page.$x(
         '//div//input[@type="button" and @class="btn jbc-btn-secondary"]'
       );
-      await Promise.all([submit2[0].click(), page.waitForNavigation()]);
+      if (submit2[0]) {
+        await Promise.all([submit2[0].click(), page.waitForNavigation()]);
+      }
 
       console.log(colors.blue(`${date} ${this.holiday_map[vacation].text}`));
     }
