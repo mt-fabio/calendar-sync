@@ -18,15 +18,15 @@ class Jira {
     this.LINE_BREAK = '----------------------------------------------------------------------------------------------------';
   }
 
+  isHoliday(date) {
+    return (
+      ['Sat', 'Sun'].indexOf(date.format('ddd')) !== -1 ||
+      JapaneseHolidays.isHoliday(date.toDate())
+    );
+  }
+
   logEvent(event) {
     event.ids.forEach((id) => {
-      const isHoliday = (date) => {
-        return (
-          ['Sat', 'Sun'].indexOf(date.format('ddd')) !== -1 ||
-          JapaneseHolidays.isHoliday(date.toDate())
-        );
-      }
-
       const eventDuration = moment.duration(event.duration / event.ids.length, 'minutes');
       const line = [
         colors.blue(moment(event.start).format('MM-DD')),
@@ -35,7 +35,9 @@ class Jira {
         colors.grey(event.description),
       ].join("  ");
 
-      if (isHoliday(moment(event.start))) {
+      if (event.skip) {
+        console.log(colors.red(`[SKIP]  ${line}  ⚠ ${event.skipReason}`));
+      } else if (this.isHoliday(moment(event.start))) {
         console.log(colors.red(line));
       } else {
         console.log(line);
@@ -50,8 +52,8 @@ class Jira {
     );
     console.log(this.LINE_BREAK);
     const totalDurationMinutes = events
-    .map(this.logEvent)
-    .reduce((acc, e) => acc += e.duration, 0);
+    .map((event) => this.logEvent(event))
+    .reduce((acc, e) => (e.skip ? acc : acc + e.duration), 0);
     console.log(this.LINE_BREAK);
     const totalDuration = moment.duration(totalDurationMinutes, 'minutes').asMinutes();
     console.log(
@@ -179,7 +181,9 @@ class Jira {
   }
 
   async persist(googleEvents) {
-    let formattedEvents = googleEvents.map((event) => {
+    let formattedEvents = googleEvents
+      .filter((event) => !event.skip) // leave (PTO/SL) takes precedence — do not log
+      .map((event) => {
       const formattedEvent = {
         calendarId: event.calendarId,
         worklogs: []

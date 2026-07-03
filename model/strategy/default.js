@@ -1,25 +1,9 @@
 // by @vadimburlakin
 //
 const moment = require('moment-timezone');
+const { buildLeaveMap } = require('../leave.js');
 const YYYYMMDD = 'YYYY-MM-DD';
 const HHmm = 'HH:mm';
-
-const holiday_map = {
-  'PTO': 'Annual leave',
-  'SL': 'Sick Leave',
-}
-
-function extractVacationType(value) {
-  const regex = /[\[{]([a-zA-Z]+)[\]}]/;
-  const match = regex.exec(value);
-  let vacation = null
-  if (match) {
-    let v = match[1].trim();
-    if (holiday_map[v])
-      vacation = v;
-  }
-  return vacation;
-}
 
 function getEventStartDate(event) {
   if (!event.start) {
@@ -93,69 +77,94 @@ function getBreakHoursForDay(startOfDay, endOfDay) {
   return breakTime;
 }
 
-function getWorkingHoursForDay(day) {
-  const dayWithoutOutOfOfficeEvents = day.filter((event) => !event.outOfOffice);
-  const vacationEvent = day.filter((event) => event.vacation)[0];
+// Does a work event overlap any of the day's leave windows? Strict inequality so
+// events that merely touch the boundary still count as work.
+function overlapsWindow(event, windows) {
+  return windows.some(
+    (w) => event.start.isBefore(w.end) && event.end.isAfter(w.start)
+  );
+}
 
-  const fullDayOutOfOffice = day.filter((event) => (event.end - event.start) / 1000 / 60 / 60 === 24 || (event.end - event.start) / 1000 / 60 / 60 === 8)[0];
-  if (!fullDayOutOfOffice && dayWithoutOutOfOfficeEvents.length > 1) {
-    const earliestEventOfTheDay = dayWithoutOutOfOfficeEvents.sort((a, b) => a.start - b.start)[0];
-    const lastEventOfTheDay = dayWithoutOutOfOfficeEvents.sort((a, b) => b.end - a.end)[0];
-    const breaktime = getBreakHoursForDay(earliestEventOfTheDay.start, lastEventOfTheDay.end);
+function vacationOnlyEntry(dayKey, vacation, duration) {
+  const date = moment(dayKey);
+  return {
+    earliestEvent: null,
+    lastEvent: null,
+    clockin: '--:--',
+    clockout: '--:--',
+    vacation,
+    year: date.format('YYYY'),
+    month: date.format('MM'),
+    day: date.format('DD'),
+    duration,
+    breaktime: '--:--',
+  };
+}
 
-    let vacationTime = 0;
-    if (vacationEvent) {
-      // TODO: Decide if we go with 4 hours by default if it's a half vacation, or calculate from event duration (4 * 60)
-      vacationTime = ((vacationEvent.end - vacationEvent.start) / 1000 / 60)
+function workEntry(earliest, last, vacation, vacationTime) {
+  const breaktime = getBreakHoursForDay(earliest.start, last.end);
+  return {
+    earliestEvent: earliest,
+    lastEvent: last,
+    clockin: earliest.start.format(HHmm),
+    clockout: last.end.format(HHmm),
+    vacation,
+    year: earliest.start.format('YYYY'),
+    month: earliest.start.format('MM'),
+    day: earliest.start.format('DD'),
+    duration: ((last.end - earliest.start) / 1000 / 60) + vacationTime - breaktime,
+    breaktime: moment(`2000-01-01 00:00`).minutes(breaktime).format('HH:mm'),
+  };
+}
+
+function getWorkingHoursForDay(dayKey, dayEvents, leave) {
+  const leaveType = leave && leave.entries.length ? leave.entries[0].type : null;
+
+  // Full-day leave -> vacation only, no clock-in.
+  if (leave && leave.full) {
+    return vacationOnlyEntry(dayKey, leaveType, 8 * 60);
+  }
+
+  // Half-day leave -> clock in/out from the events that fall OUTSIDE the leave
+  // window; the leave fills the rest of the day.
+  if (leave && leave.windows.length) {
+    const half = leave.entries.find((e) => e.ampm);
+    const vacation = `${leaveType}-${half ? half.ampm : 'AM'}`;
+    const vacationTime = leave.windows.reduce(
+      (sum, w) => sum + (w.end - w.start) / 1000 / 60,
+      0
+    );
+
+    const workEvents = dayEvents.filter(
+      (e) => !e.outOfOffice && !overlapsWindow(e, leave.windows)
+    );
+
+    if (workEvents.length) {
+      const earliest = workEvents.slice().sort((a, b) => a.start - b.start)[0];
+      const last = workEvents.slice().sort((a, b) => b.end - a.end)[0];
+      return workEntry(earliest, last, vacation, vacationTime);
     }
 
-    let vacation = '';
-    if (vacationEvent) {
-      vacation = vacationEvent.vacation
-      const hour = vacationEvent.start.format('HH');
-      ampm = '-AM';
-      if (parseInt(hour) >= 12) {
-        ampm = '-PM';
-      }
+    // No work outside the leave window -> vacation only for the half day.
+    return vacationOnlyEntry(dayKey, vacation, vacationTime);
+  }
 
-      vacation += ampm;
-    }
-
-    return {
-      earliestEvent: earliestEventOfTheDay,
-      lastEvent: lastEventOfTheDay,
-      clockin: earliestEventOfTheDay.start.format(HHmm),
-      clockout: lastEventOfTheDay.end.format(HHmm),
-      vacation: vacation,
-      year: earliestEventOfTheDay.start.format('YYYY'),
-      month: earliestEventOfTheDay.start.format('MM'),
-      day: earliestEventOfTheDay.start.format('DD'),
-      duration: ((lastEventOfTheDay.end - earliestEventOfTheDay.start) / 1000 / 60) + vacationTime - breaktime,
-      breaktime:  moment(`2000-01-01 00:00`).minutes(breaktime).format('HH:mm')
-    };
-  } else {
-    const earliestEventOfTheDay = day.sort((a, b) => a.start - b.start)[0];
-
-    if (vacationEvent) {
-      return {
-        earliestEvent: null,
-        lastEvent: null,
-        clockin: '--:--',
-        clockout: '--:--',
-        vacation: vacationEvent.vacation,
-        year: earliestEventOfTheDay.start.format('YYYY'),
-        month: earliestEventOfTheDay.start.format('MM'),
-        day: earliestEventOfTheDay.start.format('DD'),
-        duration: (8 * 60),
-        breaktime:  '--:--'
-      };
-    }
+  // No leave -> original behaviour: needs more than one event to book a day.
+  const workEvents = dayEvents.filter((e) => !e.outOfOffice);
+  if (workEvents.length > 1) {
+    const earliest = workEvents.slice().sort((a, b) => a.start - b.start)[0];
+    const last = workEvents.slice().sort((a, b) => b.end - a.end)[0];
+    return workEntry(earliest, last, '', 0);
   }
 
   return null;
 }
 
 module.exports = function (events) {
+  // Detect leave from the raw events. All-day leave events never survive the
+  // filters below (they have no dateTime), so the leave map is the only source.
+  const leaveMap = buildLeaveMap(events);
+
   // pre-process
   let hash = events
     .map((event) => ({
@@ -165,7 +174,6 @@ module.exports = function (events) {
       start: getEventStartDate(event),
       end: getEventEndDate(event),
       days: getEventDays(event),
-      vacation: extractVacationType(event.summary) || extractVacationType(event.description),
       attended: event.attendees
         ? event.status === 'confirmed' && event.attendees.find((attendee) => attendee.self).responseStatus ===
           'accepted'
@@ -183,9 +191,15 @@ module.exports = function (events) {
       return rv;
     }, {});
 
+  // Make sure days that only carry leave (e.g. an all-day PTO with no meetings)
+  // are represented even though they had no timed events.
+  for (const day of Object.keys(leaveMap)) {
+    if (!hash[day]) hash[day] = [];
+  }
+
   // post-process
   for (const [key, value] of Object.entries(hash)) {
-    const workingHours = getWorkingHoursForDay(value);
+    const workingHours = getWorkingHoursForDay(key, value, leaveMap[key]);
     if (workingHours)
       hash[key] = workingHours;
     else

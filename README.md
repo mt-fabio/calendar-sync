@@ -83,6 +83,29 @@ It should only log to JIRA events that:
 - Are not Out Of Office
 - Are not All-day
 
+## Taking time off (PTO / Sick Leave)
+
+To register leave, create an **Out of Office** event in Google Calendar and put
+`[PTO]` (annual leave) or `[SL]` (sick/care leave) in its title. Both are
+required — a normal event with the tag, or an Out of Office event without the
+tag, is *not* treated as leave.
+
+The length of the event decides how it is booked:
+
+- **≥ 8 hours** (or an **all-day** event) → **full day** off.
+- **< 8 hours** → **half day**. Morning (AM) if it starts before noon,
+  afternoon (PM) otherwise.
+
+On a leave day the tool will:
+
+- **Jobcan** — register the matching leave type, and for a half day clock you
+  in/out from your meetings *outside* the leave window (the leave fills the
+  rest). Leave that falls on a weekend/holiday is **skipped** (with a warning)
+  so you don't waste a day.
+- **Jira** — **not** log worklogs that overlap the leave (PTO/SL takes
+  precedence). Overlapping tickets are still shown with a warning before you
+  confirm, in case the overlap was unintentional.
+
 ## Strategies
 
 - `sum`: Time is the sum of all events individually (by @m13)

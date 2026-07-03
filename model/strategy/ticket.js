@@ -1,4 +1,5 @@
 const moment = require('moment-timezone');
+const { buildLeaveMap, findLeaveOverlap } = require('../leave.js');
 
 function getIds(summary, description) {
   const ids = [];
@@ -48,6 +49,10 @@ function getDate(date) {
 }
 
 module.exports = function (events) {
+  // Detect leave from the raw events *before* filtering — the leave source is
+  // the OOO events, which we drop below.
+  const leaveMap = buildLeaveMap(events);
+
   // pre-process
   let hash = events
     .map((event) => ({
@@ -68,6 +73,20 @@ module.exports = function (events) {
     .filter((event) => event.start) // only consider events that are not all-day events
     .filter((event) => !event.outOfOffice) // filter out events of type out of office
     .filter((event) => event.ids); // filter out events without a ticket in the summary or description
+
+  // Mark (don't drop) tickets that overlap leave — PTO/SL takes precedence, so
+  // they will not be logged, but we keep them so the table can warn the user in
+  // case the overlap was unintentional.
+  for (const event of hash) {
+    const overlap = findLeaveOverlap(leaveMap, event.start, event.end);
+    if (!overlap) continue;
+    event.skip = true;
+    event.skipReason = overlap.full
+      ? `overlaps ${overlap.type} (full day) — not logged`
+      : `overlaps leave ${overlap.window.start.format('HH:mm')}–${overlap.window.end.format(
+          'HH:mm'
+        )} — not logged`;
+  }
 
   return hash;
 };

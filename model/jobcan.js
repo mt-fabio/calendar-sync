@@ -43,7 +43,7 @@ class Jobcan {
     );
   }
 
-  display(events) {
+  display(events, overlapDays = new Set()) {
     let dduration = 0;
     let overtime = 0;
     let weekday = 0;
@@ -61,7 +61,13 @@ class Jobcan {
         duration = colors.green(duration.format('HH:mm'));
       }
 
-      const line = [
+      const onHoliday = this.isHoliday(moment(key));
+      const markers = [];
+      if (this.holiday_map[value.vacation] && onHoliday)
+        markers.push('⚠ Weekend/Holiday (not registered)');
+      if (overlapDays.has(key)) markers.push('⚠');
+
+      const parts = [
         colors.blue(moment(key).format('ddd')),
         moment(key).format('MM-DD'),
         colors.grey(value.clockin),
@@ -69,9 +75,11 @@ class Jobcan {
         colors.grey(value.breaktime),
         duration,
         colors.yellow(value.vacation),
-      ].join('  ');
+      ];
+      if (markers.length) parts.push(colors.yellow(markers.join('  ')));
+      const line = parts.join('  ');
 
-      if (this.isHoliday(moment(key))) {
+      if (onHoliday) {
         console.log(colors.grey(line));
       } else {
         console.log(line);
@@ -141,18 +149,19 @@ class Jobcan {
       await page.waitForSelector('select.holiday_id', { visible: true });
       await page.select('select.holiday_id', this.holiday_map[vacation].code);
 
-      // Month is the only one that only works this way. No idea why.
-      const holidayMonthSelect = await page.$('#holiday_month');
-      await holidayMonthSelect.type(holiday_date[1]);
-      const holidayToMonthSelect = await page.$('#to_holiday_month');
-      await holidayToMonthSelect.type(holiday_date[1]);
-      // await page.select('#holiday_month', holiday_date[1]);
-      // await page.select('#to_holiday_month', holiday_date[1]);
+      // Jobcan's date <select> option values are NOT zero-padded (e.g. '7', not
+      // '07'), so strip leading zeros before selecting or the value silently
+      // fails to match and the field keeps its default (the 1st).
+      const month = String(parseInt(holiday_date[1], 10));
+      const day = String(parseInt(holiday_date[2], 10));
+      const year = String(parseInt(holiday_date[0], 10));
 
-      await page.select('#holiday_day', holiday_date[2]);
-      await page.select('#to_holiday_day', holiday_date[2]);
-      await page.select('#holiday_year', holiday_date[0]);
-      await page.select('#to_holiday_year', holiday_date[0]);
+      await page.select('#holiday_month', month);
+      await page.select('#to_holiday_month', month);
+      await page.select('#holiday_day', day);
+      await page.select('#to_holiday_day', day);
+      await page.select('#holiday_year', year);
+      await page.select('#to_holiday_year', year);
 
       // Submit form and wait for navigation to a new page
       const submit = await page.$x(
@@ -235,7 +244,14 @@ class Jobcan {
           }
 
           if (this.holiday_map[value.vacation]) {
-            await this.requestVacation(page, key, value.vacation);
+            if (this.isHoliday(moment(key))) {
+              // Never book leave on a weekend/holiday — it would waste a day.
+              console.log(
+                colors.yellow(`⚠ ${key} — skipping leave registration (weekend/holiday)`)
+              );
+            } else {
+              await this.requestVacation(page, key, value.vacation);
+            }
           }
         } else {
           console.log(

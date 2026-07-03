@@ -48,13 +48,21 @@ async function main() {
     inputEvents
   );
 
+  // Days where a Jira ticket was skipped because it overlapped leave — surfaced
+  // inline on the matching Jobcan row.
+  const overlapDays = new Set(
+    jiraEvents
+      .filter((event) => event.skip)
+      .map((event) => moment(event.start).format('YYYY-MM-DD'))
+  );
+
   if (output === 'JOBCAN') {
-    jobcan.display(jobcanEvents);
+    jobcan.display(jobcanEvents, overlapDays);
   } else if (output === 'JIRA') {
     jira.display(jiraEvents);
   } else if (output === 'BOTH') {
     jira.display(jiraEvents);
-    jobcan.display(jobcanEvents);
+    jobcan.display(jobcanEvents, overlapDays);
   }
 
   const question = `Do you want to persist the information into ${
