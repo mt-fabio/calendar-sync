@@ -4,8 +4,9 @@ const colors = require('colors/safe');
 const fs = require('fs').promises;
 const JapaneseHolidays = require('japanese-holidays');
 
-//jira will return this message if the token is invalid
-const INVALID_CREDS_MSG = 'Issue does not exist or you do not have permission to see it.';
+// Jira returns this when the issue key is wrong/inaccessible — NOT a credentials
+// problem (a bad token returns HTTP 401).
+const ISSUE_NOT_FOUND_MSG = 'Issue does not exist or you do not have permission to see it.';
 
 // Jira API Documentation
 // https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-issue-worklogs/#api-rest-api-3-issue-issueidorkey-worklog-post
@@ -102,18 +103,34 @@ class Jira {
   }
 
   
-  checkResponse(responseJson) {
+  // A "handled" error: its message has already been shown to the user, so the
+  // top-level catch should stop the run quietly without printing a stack trace.
+  stop() {
+    const error = new Error('jira sync stopped');
+    error.handled = true;
+    return error;
+  }
+
+  checkResponse(responseJson, status, ticketId) {
+    // A 401 is the only genuine "bad credentials" case.
+    if (status === 401) {
+      console.log(colors.red('Invalid JIRA credentials, please check your jira.json'));
+      throw this.stop();
+    }
 
     //Check for errors in the response
     if (responseJson?.errorMessages !== undefined && responseJson?.errorMessages.length > 0) {
+      const notFound = responseJson.errorMessages.some((m) => m === ISSUE_NOT_FOUND_MSG);
+      console.log(
+        colors.red(
+          notFound
+            ? `${ticketId}: issue does not exist or you lack permission — check the ticket ID for typos`
+            : `${ticketId}: failed to add worklog to jira: ${responseJson.errorMessages.join(', ')}`
+        )
+      );
 
-      //We know the response we get for bad credentials, so we can check for that specifically
-      console.log(colors.red(responseJson.errorMessages.some(m => m === INVALID_CREDS_MSG)
-      ? 'Invalid JIRA credentials, please check your jira.json'
-      : 'Failed to add worklog to jira: ' + responseJson.errorMessages));
-
-      //Throw an error to stop the job early
-      throw new Error('Failed to add worklog to jira. Exiting Job');
+      //Throw to stop the job early
+      throw this.stop();
     }
   }
 
@@ -142,7 +159,7 @@ class Jira {
     const response = await fetch(jiraRequestUrl, jiraRequestPayload);
     const responseJson = await response.json();
 
-    this.checkResponse(responseJson);
+    this.checkResponse(responseJson, response.status, jiraEvent.id);
 
     jiraEvent.jiraWorklogId = jiraWorklogId;
     return jiraEvent;
@@ -173,14 +190,44 @@ class Jira {
 
     const response = await fetch(jiraRequestUrl, jiraRequestPayload);
     const responseJson = await response.json();
-    
-    this.checkResponse(responseJson);
+
+    this.checkResponse(responseJson, response.status, jiraEvent.id);
 
     jiraEvent.jiraWorklogId = responseJson.id;
     return jiraEvent;
   }
 
+  // Verifies the token independently of any ticket, so we can tell a bad secret
+  // apart from a bad ticket key (Jira can return the same "issue does not exist"
+  // 404 for both). Returns true when the credentials are valid.
+  async verifyCredentials() {
+    let credential;
+    try {
+      const bToken = await fs.readFile(this.CREDENTIAL_PATH);
+      credential = JSON.parse(bToken.toString('utf8'));
+    } catch (error) {
+      console.log(colors.red(`Could not read ${this.CREDENTIAL_PATH}`));
+      throw this.stop();
+    }
+
+    const response = await fetch(`${credential.domainUrl}/rest/api/3/myself`, {
+      headers: {
+        Authorization: `Basic ${Buffer.from(
+          `${credential.email}:${credential.token}`
+        ).toString('base64')}`,
+        Accept: 'application/json',
+      },
+    });
+
+    if (response.status === 401 || response.status === 403) {
+      console.log(colors.red('Invalid JIRA credentials, please check your jira.json'));
+      throw this.stop();
+    }
+  }
+
   async persist(googleEvents) {
+    await this.verifyCredentials();
+
     let formattedEvents = googleEvents
       .filter((event) => !event.skip) // leave (PTO/SL) takes precedence — do not log
       .map((event) => {
@@ -241,6 +288,10 @@ class Jira {
       }
 
       savedEvents[calendarId] = event;
+      // Persist after each event so that if a later event fails (e.g. a bad
+      // ticket throws), the worklogs already posted are recorded and won't be
+      // logged again on the next run.
+      await this.saveEvents(savedEvents);
     }
 
     await this.saveEvents(savedEvents);

@@ -87,4 +87,9 @@ async function main() {
   }
 }
 
-main().catch(console.error);
+main().catch((error) => {
+  // Known, already-reported failures (bad creds, bad ticket) just stop the run;
+  // only print a stack trace for genuinely unexpected errors.
+  if (!error || !error.handled) console.error(error);
+  process.exitCode = 1;
+});
