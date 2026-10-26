@@ -135,6 +135,13 @@ class Jira {
   }
 
   async updateWorklog(jiraWorklogId, jiraEvent) {
+    // A saved worklog may have lost its jiraWorklogId (older records). Rather
+    // than PUT to .../worklog/undefined — which Jira rejects with "Cannot find
+    // worklog with id: 'undefined'" — recreate it so the state self-heals.
+    if (jiraWorklogId === undefined || jiraWorklogId === null) {
+      return this.addWorklog(jiraEvent);
+    }
+
     let credential;
     try {
       const bToken = await fs.readFile(this.CREDENTIAL_PATH);
@@ -259,6 +266,11 @@ class Jira {
           for (let savedWorklog of savedEvent.worklogs) {
             if (savedWorklog.id === worklog.id) {
               found = true;
+              // Carry the Jira worklog id forward so it survives the re-save
+              // below, even when the worklog is unchanged. Otherwise the fresh
+              // worklog object (which lacks jiraWorklogId) overwrites the saved
+              // one, and a later update posts to .../worklog/undefined.
+              worklog.jiraWorklogId = savedWorklog.jiraWorklogId;
               const shouldUpdate = (
                 worklog.description != savedWorklog.description || worklog.timeSpentSeconds != savedWorklog.timeSpentSeconds
               );
