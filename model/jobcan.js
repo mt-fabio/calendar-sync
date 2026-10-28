@@ -115,6 +115,74 @@ class Jobcan {
     await page.waitForSelector('#ter_time', { visible: true });
   }
 
+  // Existing clockings on the open day, e.g. [{ type: 'Clock In', time: '09:00' }].
+  // A pending revision shows "old → new", so take the last time in the cell.
+  async getClockings(page) {
+    return page.evaluate(() =>
+      [...document.querySelectorAll('table.jbc-table tr.text-center')].map((row) => {
+        const times = row.children[1].innerText.match(/\d{2}:\d{2}/g) || [];
+        return { type: row.children[0].innerText.trim(), time: times[times.length - 1] };
+      })
+    );
+  }
+
+  // Opens the modal in "Clocking Revision" mode for the first Clock In or the
+  // last Clock Out row. Returns false if that row has no Revision link.
+  async openRevisionForm(page, type) {
+    const opened = await page.evaluate((type) => {
+      const rows = [...document.querySelectorAll('table.jbc-table tr.text-center')].filter(
+        (row) => row.children[0].innerText.trim() === type
+      );
+      const row = type === 'Clock In' ? rows[0] : rows[rows.length - 1];
+      const link = row && [...row.querySelectorAll('a')].find((a) => a.innerText.trim() === 'Revision');
+      if (link) link.click();
+      return !!link;
+    }, type);
+    if (opened) await page.waitForSelector('#ter_time', { visible: true });
+    return opened;
+  }
+
+  async submitTime(page, time) {
+    await this.clear(page, '#ter_time');
+    await page.type('#ter_time', time.replace(':', ''));
+    await page.evaluate(() => document.querySelector('#insert_button').click());
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+  }
+
+  // Day already has clockings: revise clock-in/out if the calendar changed them.
+  async reviseClocking(page, key, value) {
+    const clockings = await this.getClockings(page);
+    const clockIn = clockings.find((c) => c.type === 'Clock In');
+    const clockOut = clockings.filter((c) => c.type === 'Clock Out').pop();
+
+    const changes = [];
+    if (value.clockin !== '--:--' && clockIn && clockIn.time !== value.clockin)
+      changes.push({ type: 'Clock In', from: clockIn.time, to: value.clockin });
+    if (value.clockout !== '--:--' && (!clockOut || clockOut.time !== value.clockout))
+      changes.push({ type: 'Clock Out', from: clockOut && clockOut.time, to: value.clockout });
+
+    if (!changes.length) {
+      console.log(colors.grey(`${key} ${value.clockin} ~ ${value.clockout}`));
+      return;
+    }
+
+    for (const change of changes) {
+      // A missing Clock Out is added as a new clocking rather than revised.
+      if (change.from) {
+        if (!(await this.openRevisionForm(page, change.type))) {
+          console.log(colors.yellow(`⚠ ${key} ${change.type} can't be revised`));
+          continue;
+        }
+      } else {
+        await this.openClockForm(page);
+      }
+      await this.submitTime(page, change.to);
+      console.log(
+        colors.yellow(`${key} ${change.type} ${change.from || '--:--'} → ${change.to} (revised)`)
+      );
+    }
+  }
+
   async exists(page, xpath) {
     const elements = await page.evaluate((xpath) => {
       const result = document.evaluate(xpath, document, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
@@ -259,9 +327,7 @@ class Jobcan {
             }
           }
         } else {
-          console.log(
-            colors.grey(`${key} ${value.clockin} ~ ${value.clockout}`)
-          );
+          await this.reviseClocking(page, key, value);
         }
       }
     } catch (error) {
