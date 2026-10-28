@@ -4,6 +4,10 @@
   "description": "Sync Jobcan with Google Calendar or CSV",
   "main": "index.js",
   "scripts": {
+    "month": "node . month",
+    "mtd": "node . mtd",
+    "week": "node . week",
+    "wtd": "node . wtd",
     "test": "echo \"Error: no test specified\" && exit 0"
   },
   "repository": {

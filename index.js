@@ -12,6 +12,19 @@ function getDateRange() {
   let timeMax = moment().startOf(unit).add(2, 'day').toISOString();
 
   let myArgs = process.argv.slice(2);
+  // Shortcuts: whole current month/week, or from its start up to and including
+  // today. End is exclusive, so "to date" ends at the start of tomorrow.
+  const tomorrow = moment().startOf('day').add(1, 'day');
+  const shortcuts = {
+    month: [moment().startOf('month'), moment().startOf('month').add(1, 'month')],
+    mtd: [moment().startOf('month'), tomorrow],
+    week: [moment().startOf('week'), moment().startOf('week').add(1, 'week')],
+    wtd: [moment().startOf('week'), tomorrow],
+  };
+  if (shortcuts[myArgs[0]]) {
+    const [start, end] = shortcuts[myArgs[0]];
+    return { timeMin: start.toISOString(), timeMax: end.toISOString() };
+  }
   if (myArgs[0]) timeMin = moment(myArgs[0]).toISOString();
   if (myArgs[1]) timeMax = moment(myArgs[1]).toISOString();
 

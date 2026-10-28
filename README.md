@@ -123,6 +123,19 @@ On a leave day the tool will:
 
 1. You must set up your .env file correctly based on the desired OUTPUT.
 2. The first argument is a start date (inclusive) and second is end date (exclusive), retrieves your last week by default.
+   Instead of dates you can pass a shortcut (also available as `npm run <shortcut>`):
+
+   | Shortcut | Range |
+   |---|---|
+   | `month` | Whole current month |
+   | `mtd` | Month to date: 1st of the month through today |
+   | `week` | Whole current week (Sunday to Saturday) |
+   | `wtd` | Week to date: start of the week through today |
+
+   ```bash
+   $ node . mtd   # or: npm run mtd
+   ```
+
 3. You only need to do this once, but if you haven't logged into your google account via the app you will be prompted this
 
 ```bash
