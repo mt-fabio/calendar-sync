@@ -105,6 +105,16 @@ class Jobcan {
     await page.$eval(selector, (el) => (el.value = ''));
   }
 
+  // The clock-time form lives in a modal (#modifyModal) that only opens via
+  // "Add New Clocking" (intoModifyMode()), so open it if it isn't showing.
+  async openClockForm(page) {
+    await page.evaluate(() => {
+      const input = document.querySelector('#ter_time');
+      if (input && input.offsetParent === null) intoModifyMode();
+    });
+    await page.waitForSelector('#ter_time', { visible: true });
+  }
+
   async exists(page, xpath) {
     const elements = await page.evaluate((xpath) => {
       const result = document.evaluate(xpath, document, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
@@ -191,8 +201,8 @@ class Jobcan {
           `https://ssl.jobcan.jp/employee/adit/modify?year=${value.year}&month=${value.month}&day=${value.day}`
         );
 
-        // Wait for the #ter_time element to appear
-        await page.waitForSelector('#ter_time', { visible: true });
+        // Wait for the #ter_time element to load (hidden until the modal opens)
+        await page.waitForSelector('#ter_time');
         
         // Add a delay after navigation
         await new Promise(resolve => setTimeout(resolve, 1000));
@@ -216,6 +226,7 @@ class Jobcan {
             );
 
             // Clock-In
+            await this.openClockForm(page);
             await this.clear(page, '#ter_time');
             await page.type('#ter_time', value.clockin.replace(':', ''));
             await page.evaluate(() =>
@@ -226,6 +237,7 @@ class Jobcan {
             await new Promise(resolve => setTimeout(resolve, 1000));
 
             // Clock-Out
+            await this.openClockForm(page);
             await this.clear(page, '#ter_time');
             await page.type('#ter_time', value.clockout.replace(':', ''));
             await page.evaluate(() =>
